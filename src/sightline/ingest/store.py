@@ -131,6 +131,29 @@ class MetadataStore:
     def count_pages(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
 
+    def get_page(self, accession: str, page_no: int) -> StoredPage | None:
+        """Fetch one page by its identity — used to hand retrieved pages to the answerer."""
+        r = self._conn.execute(
+            """
+            SELECT p.accession, p.page_no, p.image_path, p.text,
+                   f.ticker, f.form, f.filing_date
+            FROM pages p JOIN filings f ON f.accession = p.accession
+            WHERE p.accession = ? AND p.page_no = ?
+            """,
+            (accession, page_no),
+        ).fetchone()
+        if r is None:
+            return None
+        return StoredPage(
+            accession=r["accession"],
+            page_no=r["page_no"],
+            image_path=Path(r["image_path"]),
+            text=r["text"],
+            ticker=r["ticker"],
+            form=r["form"],
+            filing_date=r["filing_date"],
+        )
+
     def iter_pages(self) -> Iterator[StoredPage]:
         """Stream every page with its filing provenance — the input to indexing (M1/M2)."""
         cur = self._conn.execute(

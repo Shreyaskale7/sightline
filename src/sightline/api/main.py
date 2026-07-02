@@ -32,18 +32,24 @@ def health() -> dict[str, str]:
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
-    """Placeholder pipeline. Wire the real stages as you build M1->M3.
+    """M1 pipeline: retrieve top-k pages -> Claude answers from their text, with citations.
 
-    Target flow: router -> retrieve -> answer (VLM over page images) -> verify -> respond.
-    Each stage should run inside a `span(...)` so the whole request is one trace.
+    M2 switches the answer step to page IMAGES; M3 adds router + verifier. Each stage runs
+    inside a `span(...)` so the whole request is one trace.
     """
-    with span("query", question=req.question, k=req.k) as s:
-        # TODO(M1): retrieve = TextRetriever().retrieve(req.question, k=req.k)
-        # TODO(M2): answer over the retrieved PAGE IMAGES with the VLM
-        # TODO(M3): verify every claim is cited; abstain if not
-        s["stub"] = True
+    from ..answerer import Answerer
+    from ..config import settings
+    from ..ingest.store import MetadataStore
+    from ..retrieval.text_baseline import TextRetriever
+
+    with span("query", question=req.question, k=req.k):
+        with span("retrieve", k=req.k), TextRetriever() as retriever:
+            hits = retriever.retrieve(req.question, k=req.k)
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
+            pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
+        result = Answerer().answer(req.question, pages)
         return QueryResponse(
-            answer="Not implemented yet — wire the pipeline stages (see CLAUDE.md milestones).",
-            citations=[],
-            abstained=True,
+            answer=result.answer,
+            citations=[Citation(accession=c.accession, page_no=c.page_no) for c in result.citations],
+            abstained=result.abstained,
         )

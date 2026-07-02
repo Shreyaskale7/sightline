@@ -17,6 +17,8 @@ dependencies = [
     "playwright>=1.44",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
+    # Generation: hosted Claude API for the M1 answer path + eval judge.
+    "anthropic>=0.30",
 ]
 
 [project.optional-dependencies]
