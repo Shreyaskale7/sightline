@@ -47,7 +47,7 @@ class _OpenAICompatMessages:
     We throttle proactively for `:free` models (cheaper than tripping the limit) and retry
     with exponential backoff on 429s (a 429 means "slow down", not "give up")."""
 
-    _FREE_INTERVAL_S = 4.0  # ~15 req/min, under the typical 20/min free cap
+    _FREE_INTERVAL_S = 4.0  # floor for `:free` models, ~15 req/min
     _MAX_RETRIES = 4
 
     def __init__(self, base_url: str, api_key: str) -> None:
@@ -59,9 +59,14 @@ class _OpenAICompatMessages:
         self._last_call = 0.0
 
     def _throttle(self, model: str) -> None:
-        if ":free" not in model:
+        # Configured interval (e.g. Gemini free tier ~10 rpm -> 6s), with a floor for
+        # OpenRouter `:free` models even when the setting is 0.
+        interval = settings.llm_min_interval_s
+        if ":free" in model:
+            interval = max(interval, self._FREE_INTERVAL_S)
+        if interval <= 0:
             return
-        wait = self._FREE_INTERVAL_S - (time.monotonic() - self._last_call)
+        wait = interval - (time.monotonic() - self._last_call)
         if wait > 0:
             time.sleep(wait)
 

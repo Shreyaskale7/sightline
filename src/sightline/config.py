@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     llm_model: str = "your-chat-model"
     vlm_model: str = "your-vision-model"
     router_model: str = "your-small-model"
+    # Minimum seconds between LLM requests (free tiers cap requests/minute).
+    # 0 = no throttle. `:free`-suffixed models always get a floor of 4s regardless.
+    llm_min_interval_s: float = 0.0
 
     # Observability (optional). Blank = tracing is a no-op.
     langfuse_public_key: str = ""
