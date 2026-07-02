@@ -1,9 +1,10 @@
 # Golden eval set for the M1 text baseline.
-# Labels are grounded in the actual ingested pages (NVDA/AMD/INTC/MU/QCOM latest 10-Ks).
-# Each company has exactly one 10-K in the corpus, so "most recent 10-K" is unambiguous.
+# Labels are grounded in the actual ingested pages. Corpus: NVDA/AMD/INTC/MU/QCOM,
+# 1 latest 10-K + 3 recent 10-Qs each (20 filings, ~1300 pages). Each company still has
+# exactly one 10-K, so "most recent 10-K" phrasing stays unambiguous.
 # Figures are in USD millions, taken from each consolidated statement of operations/income.
-# Slices kept: basic, cross_company, unanswerable. (chart_only waits for M2 — charts render
-# blank in M1's offline HTML rendering.) Grow toward ~150 cases as the corpus grows.
+# Slices: basic, cross_company, multi_hop, unanswerable. (chart_only waits for M2 — charts
+# render blank in M1's offline HTML rendering.) Grow toward ~150 cases as the corpus grows.
 cases:
   # --- basic: single-page financial line items ------------------------------
   - id: nvda-revenue
@@ -235,6 +236,40 @@ cases:
     gold_answer: "Intel 18A."
     relevant_pages:
       - { accession: "0000050863-26-000011", page_no: 9 }
+
+  # --- multi_hop: needs pages from THREE quarterly filings -------------------
+  # (Unlocked by ingesting 10-Qs. Hard by design: one query must surface pages
+  #  from three different filings. Expect low retrieval scores — that gap is the
+  #  measured justification for the M3 planner/decomposition.)
+  - id: nvda-quarterly-revenue-trend
+    question: "How did NVIDIA's quarterly revenue change across its last three 10-Q filings?"
+    slice: multi_hop
+    answerable: true
+    gold_answer: "It rose each quarter: $46,743M, then $57,006M, then $81,615M."
+    relevant_pages:
+      - { accession: "0001045810-25-000209", page_no: 3 }
+      - { accession: "0001045810-25-000230", page_no: 3 }
+      - { accession: "0001045810-26-000052", page_no: 3 }
+
+  - id: amd-quarterly-revenue-trend
+    question: "How did AMD's quarterly net revenue change across its last three 10-Q filings?"
+    slice: multi_hop
+    answerable: true
+    gold_answer: "It rose each quarter: $7,685M, then $9,246M, then $10,253M."
+    relevant_pages:
+      - { accession: "0000002488-25-000108", page_no: 3 }
+      - { accession: "0000002488-25-000166", page_no: 3 }
+      - { accession: "0000002488-26-000076", page_no: 3 }
+
+  - id: mu-quarterly-revenue-trend
+    question: "Did Micron's quarterly revenue increase or decrease across its last three 10-Q filings?"
+    slice: multi_hop
+    answerable: true
+    gold_answer: "It increased each quarter."
+    relevant_pages:
+      - { accession: "0000723125-25-000046", page_no: 5 }
+      - { accession: "0000723125-26-000006", page_no: 5 }
+      - { accession: "0000723125-26-000015", page_no: 5 }
 
   # --- cross_company (batch 2) -----------------------------------------------
   - id: mu-qcom-revenue-compare

@@ -21,24 +21,53 @@ console = Console()
 GOLDEN = Path(__file__).parent / "golden_set.yaml"
 
 
-def run(golden_path: Path = GOLDEN) -> None:
+def _make_retrieve_fn(name: str):
+    """Build the retrieval function for one ablation config. Returns (fn, cleanup).
+
+    dense  — BGE embeddings in Qdrant (the M1 baseline)
+    bm25   — keyword/exact-match ranking (rank_bm25), built in memory from the store
+    hybrid — both legs fused with Reciprocal Rank Fusion (each contributes its top-20)
+    """
+    from sightline.config import settings
+    from sightline.ingest.store import MetadataStore
     from sightline.retrieval.text_baseline import TextRetriever
 
+    if name == "dense":
+        r = TextRetriever()
+        if r.count() == 0:
+            raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
+        return r.retrieve, r.close
+
+    from sightline.retrieval.bm25 import BM25Retriever
+
+    with MetadataStore(settings.data_dir / "sightline.db") as store:
+        bm25 = BM25Retriever(store.iter_pages())
+    if name == "bm25":
+        return bm25.retrieve, (lambda: None)
+
+    if name == "hybrid":
+        from sightline.retrieval.fusion import rrf
+
+        dense = TextRetriever()
+        if dense.count() == 0:
+            raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
+
+        def fn(query: str, k: int = 5):
+            # Each leg over-fetches (top-20) so fusion has real overlap to work with.
+            return rrf(dense.retrieve(query, k=20), bm25.retrieve(query, k=20), top_n=k)
+
+        return fn, dense.close
+
+    raise SystemExit(f"Unknown retriever '{name}' (expected dense | bm25 | hybrid)")
+
+
+def run(golden_path: Path = GOLDEN, retriever_name: str = "dense") -> None:
     cases = load_golden_set(golden_path)
-    console.print(f"[bold]Loaded {len(cases)} eval cases[/bold]")
+    console.print(f"[bold]Loaded {len(cases)} eval cases[/bold] — "
+                  f"retriever: [bold]{retriever_name}[/bold]")
 
-    retriever = TextRetriever()
+    retrieve_fn, cleanup = _make_retrieve_fn(retriever_name)
     try:
-        indexed = retriever.count()
-        if indexed == 0:
-            console.print(
-                "[yellow]Index is empty.[/yellow] Ingest filings (scripts/ingest.py) and build "
-                "the index (scripts/index.py) first."
-            )
-            _preview_slices(cases)
-            return
-        console.print(f"[dim]retrieving against {indexed} indexed pages[/dim]")
-
         # Retrieval metrics score only answerable cases that have labeled gold pages.
         # Unanswerable cases exist to test *abstention* on the generation side, so including
         # them here (empty relevant-set -> guaranteed 0) would understate retrieval quality.
@@ -49,7 +78,7 @@ def run(golden_path: Path = GOLDEN) -> None:
         per_slice: dict[str, list[tuple[float, float, float]]] = {}
         for c in retrieval_cases:
             relevant = {f"{p.accession}#{p.page_no}" for p in c.relevant_pages}
-            hits = retriever.retrieve(c.question, k=k)  # -> list[Hit]
+            hits = retrieve_fn(c.question, k=k)  # -> list[Hit]
             retrieved = [f"{h.accession}#{h.page_no}" for h in hits]
             scores = (
                 recall_at_k(retrieved, relevant, 5),
@@ -58,9 +87,10 @@ def run(golden_path: Path = GOLDEN) -> None:
             )
             per_slice.setdefault(c.slice, []).append(scores)
 
-        _print_metrics(per_slice, n_cases=len(retrieval_cases), n_unanswerable=n_unanswerable)
+        _print_metrics(per_slice, n_cases=len(retrieval_cases), n_unanswerable=n_unanswerable,
+                       retriever_name=retriever_name)
     finally:
-        retriever.close()
+        cleanup()
 
 
 def _mean(rows: list[tuple[float, float, float]], i: int) -> float:
@@ -131,8 +161,9 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
                   "approximate until M3 calibration (Cohen's κ vs human labels).[/dim]")
 
 
-def _print_metrics(per_slice: dict[str, list], n_cases: int, n_unanswerable: int) -> None:
-    table = Table(title=f"Text baseline — retrieval metrics ({n_cases} answerable cases)")
+def _print_metrics(per_slice: dict[str, list], n_cases: int, n_unanswerable: int,
+                   retriever_name: str = "dense") -> None:
+    table = Table(title=f"Retrieval metrics — {retriever_name} ({n_cases} answerable cases)")
     table.add_column("slice")
     table.add_column("n", justify="right")
     table.add_column("Recall@5", justify="right")
@@ -171,8 +202,12 @@ def _preview_slices(cases) -> None:
 if __name__ == "__main__":
     import sys
 
-    if "--generation" in sys.argv:
-        run()            # retrieval table first (free) ...
-        run_generation()  # ... then the paid generation pass
+    args = sys.argv[1:]
+    name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
+    if "--ablation" in args:
+        for n in ("bm25", "dense", "hybrid"):  # one table per config = the ablation
+            run(retriever_name=n)
     else:
-        run()
+        run(retriever_name=name)
+    if "--generation" in args:
+        run_generation()  # the paid pass (needs LLM_API_KEY)
