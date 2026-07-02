@@ -116,12 +116,18 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
     # Counters. "Citation accuracy" = of the answers given, how many cite a gold page.
     # "Abstention recall" = of the unanswerable questions, how many were refused.
     n_ans = n_false_abstain = n_cite_hit = n_correct = n_judged = 0
-    n_unans = n_abstained_ok = 0
+    n_unans = n_abstained_ok = n_attempted = 0
+    interrupted: str | None = None
     try:
         for c in cases:
             hits = retriever.retrieve(c.question, k=k)
             pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
-            result = answerer.answer(c.question, pages)
+            try:
+                result = answerer.answer(c.question, pages)
+            except Exception as e:  # quota/network mid-run -> keep the partial scorecard
+                interrupted = f"stopped at '{c.id}': {e}"
+                break
+            n_attempted += 1
 
             if not c.answerable:
                 n_unans += 1
@@ -138,16 +144,23 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
             gold = {(p.accession, p.page_no) for p in c.relevant_pages}
             cite_hit = any((ct.accession, ct.page_no) in gold for ct in result.citations)
             n_cite_hit += cite_hit
-            correct = judge.is_correct(c.question, c.gold_answer or "", result.answer)
-            n_judged += 1
-            n_correct += correct
-            console.print(f"  {c.id:32s} cite={'✓' if cite_hit else '✗'} "
-                          f"correct={'✓' if correct else '✗'}")
+            try:
+                correct = judge.is_correct(c.question, c.gold_answer or "", result.answer)
+                n_judged += 1
+                n_correct += correct
+                verdict = "✓" if correct else "✗"
+            except Exception:  # judge quota failure shouldn't lose the answer data
+                verdict = "?"
+            console.print(f"  {c.id:32s} cite={'✓' if cite_hit else '✗'} correct={verdict}")
     finally:
         retriever.close()
         store.close()
 
-    table = Table(title="Text baseline — generation metrics")
+    title = "Text baseline — generation metrics"
+    if interrupted:
+        title += f" (PARTIAL: {n_attempted}/{len(cases)} cases)"
+        console.print(f"[red]{interrupted}[/red]")
+    table = Table(title=title)
     table.add_column("metric")
     table.add_column("value", justify="right")
     answered = n_ans - n_false_abstain

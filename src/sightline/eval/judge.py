@@ -37,11 +37,9 @@ class Judge:
 
     def _ensure_client(self) -> None:
         if self._client is None:
-            from anthropic import Anthropic
+            from ..llm import make_client
 
-            if not settings.llm_api_key:
-                raise RuntimeError("LLM_API_KEY is empty — set it in .env.")
-            self._client = Anthropic(api_key=settings.llm_api_key)
+            self._client = make_client()
 
     def is_correct(self, question: str, gold: str, answer: str) -> bool:
         self._ensure_client()

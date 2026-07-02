@@ -91,3 +91,32 @@ python -m sightline.eval.run --ablation
 ```
 
 **M2 target:** beat dense-only Recall@5 = 0.313 / nDCG@10 = 0.267 on this corpus and golden set.
+
+## First generation scorecard — PARTIAL (2026-07-02)
+
+**Setup:** answers by `anthropic/claude-sonnet-4.5`, judged by `anthropic/claude-haiku-4.5`,
+both via OpenRouter. Retrieval: dense top-5. The run stopped at case 15/38 when the
+OpenRouter account's ~$0.22 promotional credit ran out (402) — the runner now survives that
+and reports partial numbers. Full re-run pending credits.
+
+Over the 14 answerable cases attempted (9 answered, 5 abstained):
+
+| Metric | Value |
+|---|---:|
+| answer correctness (judge) | 7/9 = 0.78 |
+| citation accuracy | 5/9 = 0.56 |
+| false abstentions | 5/14 = 0.36 |
+| abstention recall (unanswerable) | not reached |
+
+### What the partial data already shows
+- **Grounding works.** Every answer given was drawn from retrieved pages; when the right page
+  wasn't retrieved, the model *abstained* rather than hallucinated (all 5 false abstentions are
+  exactly the cases where retrieval missed — amd-revenue, nvda-foundry, mu-employees,
+  nvda-intc-rnd-compare, amd-rnd). Generation quality is retrieval-bound: fix retrieval (M2)
+  and false abstentions should fall roughly in step.
+- **Citation ≠ correctness.** e.g. `intc-revenue` was answered correctly but "mis-cited": the
+  same figure appears on more than one page (income statement + MD&A), and the model cited a
+  legitimate page the golden set doesn't list. Action item: golden labels should list *all*
+  pages that state the fact, not just the statement page.
+- Cost so far: ~$0.22 for ~24 calls (15 Sonnet answers + 9 Haiku judgments) — a full 38-case
+  scorecard costs roughly $0.50/run. Budget accordingly (M4 makes this a dashboard).

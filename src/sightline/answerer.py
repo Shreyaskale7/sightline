@@ -109,13 +109,9 @@ class Answerer:
 
     def _ensure_client(self) -> None:
         if self._client is None:
-            from anthropic import Anthropic  # lazy: keeps import-time light
+            from .llm import make_client  # lazy: keeps import-time light
 
-            if not settings.llm_api_key:
-                raise RuntimeError(
-                    "LLM_API_KEY is empty. Get a key at console.anthropic.com and put it in .env."
-                )
-            self._client = Anthropic(api_key=settings.llm_api_key)
+            self._client = make_client()
 
     def answer(self, question: str, pages: Sequence[PageLike]) -> AnswerResult:
         """One retrieval-grounded answer. No pages -> abstain without spending a token."""
