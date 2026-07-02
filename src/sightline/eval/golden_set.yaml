@@ -1,0 +1,129 @@
+# Golden eval set for the M1 text baseline.
+# Labels are grounded in the actual ingested pages (NVDA/AMD/INTC/MU/QCOM latest 10-Ks).
+# Each company has exactly one 10-K in the corpus, so "most recent 10-K" is unambiguous.
+# Figures are in USD millions, taken from each consolidated statement of operations/income.
+# Slices kept: basic, cross_company, unanswerable. (chart_only waits for M2 — charts render
+# blank in M1's offline HTML rendering.) Grow toward ~150 cases as the corpus grows.
+cases:
+  # --- basic: single-page financial line items ------------------------------
+  - id: nvda-revenue
+    question: "What was NVIDIA's total revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$215,938 million (about $216.0 billion)."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+
+  - id: amd-revenue
+    question: "What was AMD's net revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$34,639 million."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 61 }
+
+  - id: intc-revenue
+    question: "What was Intel's net revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$52,853 million."
+    relevant_pages:
+      - { accession: "0000050863-26-000011", page_no: 72 }
+
+  - id: mu-revenue
+    question: "What was Micron's total revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$37,378 million."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 65 }
+
+  - id: qcom-revenue
+    question: "What were Qualcomm's total revenues in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$44,284 million."
+    relevant_pages:
+      - { accession: "0000804328-25-000085", page_no: 59 }
+
+  - id: nvda-rnd
+    question: "How much did NVIDIA spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$18,497 million."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+
+  - id: intc-operating-result
+    question: "Did Intel report operating income or an operating loss in its most recent 10-K, and how much?"
+    slice: basic
+    answerable: true
+    gold_answer: "An operating loss of $2,214 million."
+    relevant_pages:
+      - { accession: "0000050863-26-000011", page_no: 72 }
+
+  - id: qcom-rnd
+    question: "How much did Qualcomm spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$9,042 million."
+    relevant_pages:
+      - { accession: "0000804328-25-000085", page_no: 59 }
+
+  # --- basic: single-page qualitative ---------------------------------------
+  - id: nvda-foundry
+    question: "Which third-party foundries does NVIDIA rely on to manufacture its chips?"
+    slice: basic
+    answerable: true
+    gold_answer: "TSMC (Taiwan Semiconductor) and Samsung."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 8 }
+
+  - id: mu-employees
+    question: "Approximately how many employees did Micron report in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "Approximately 53,000 employees."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 16 }
+
+  # --- cross_company: answer needs pages from two filings -------------------
+  - id: nvda-intc-rnd-compare
+    question: "Which company spent more on R&D in its most recent 10-K, NVIDIA or Intel, and by how much?"
+    slice: cross_company
+    answerable: true
+    gold_answer: "NVIDIA ($18,497M) spent more than Intel ($13,774M) — about $4,723M more."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+      - { accession: "0000050863-26-000011", page_no: 72 }
+
+  - id: nvda-amd-revenue-compare
+    question: "Whose revenue was larger in the most recent 10-K, NVIDIA's or AMD's?"
+    slice: cross_company
+    answerable: true
+    gold_answer: "NVIDIA ($215,938M) was far larger than AMD ($34,639M)."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+      - { accession: "0000002488-26-000018", page_no: 61 }
+
+  # --- unanswerable: the system should ABSTAIN, not guess -------------------
+  - id: unanswerable-ceo-salary-2005
+    question: "What was NVIDIA's CEO's exact salary in 2005 according to these filings?"
+    slice: unanswerable
+    answerable: false
+    gold_answer: null
+    relevant_pages: []
+
+  - id: unanswerable-tsmc-revenue
+    question: "What was TSMC's total revenue in its most recent 10-K?"
+    slice: unanswerable
+    answerable: false   # TSMC is not in this corpus — plausible but out-of-scope
+    gold_answer: null
+    relevant_pages: []
+
+  - id: unanswerable-nvda-2030-forecast
+    question: "What is NVIDIA's projected total revenue for fiscal year 2030?"
+    slice: unanswerable
+    answerable: false   # forward guidance not disclosed in the filing
+    gold_answer: null
+    relevant_pages: []
