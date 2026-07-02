@@ -9,10 +9,22 @@ Rather than teach the answerer/judge two protocols, this module gives them ONE i
 the Anthropic SDK's `client.messages.create(...) -> resp.content[0].text` shape — and adapts
 the OpenAI-compatible wire format behind it when `LLM_BASE_URL` is set. Callers never know
 the difference, and unit tests keep injecting simple fakes of the same shape.
+
+Every client is wrapped in an exact-match RESPONSE CACHE (SQLite, keyed on a hash of
+model+params+messages). Why: on a student budget the daily request quota IS the budget —
+free tiers allow ~50 requests/day. With the cache, repeating an eval run only pays for
+cases it hasn't seen, so a quota-interrupted run finishes for free the next day, and
+"run the eval again" after a code refactor costs zero requests. (Semantic caching — matching
+*similar* prompts — arrives in M4; exact-match is the safe, obviously-correct version.)
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import sqlite3
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,23 +43,47 @@ class _Response:
 
 
 class _OpenAICompatMessages:
+    """Free-tier etiquette lives here: gateways cap requests per MINUTE as well as per day.
+    We throttle proactively for `:free` models (cheaper than tripping the limit) and retry
+    with exponential backoff on 429s (a 429 means "slow down", not "give up")."""
+
+    _FREE_INTERVAL_S = 4.0  # ~15 req/min, under the typical 20/min free cap
+    _MAX_RETRIES = 4
+
     def __init__(self, base_url: str, api_key: str) -> None:
         self._client = httpx.Client(
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=120.0,
         )
+        self._last_call = 0.0
+
+    def _throttle(self, model: str) -> None:
+        if ":free" not in model:
+            return
+        wait = self._FREE_INTERVAL_S - (time.monotonic() - self._last_call)
+        if wait > 0:
+            time.sleep(wait)
 
     def create(self, *, model: str, max_tokens: int, messages: list[dict[str, Any]]) -> _Response:
-        resp = self._client.post(
-            "/chat/completions",
-            json={"model": model, "max_tokens": max_tokens, "messages": messages},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if "error" in data:  # OpenRouter can return 200 with an embedded error
-            raise RuntimeError(f"LLM gateway error: {data['error']}")
-        return _Response(content=[_TextBlock(text=data["choices"][0]["message"]["content"])])
+        backoff = 10.0
+        for attempt in range(self._MAX_RETRIES + 1):
+            self._throttle(model)
+            resp = self._client.post(
+                "/chat/completions",
+                json={"model": model, "max_tokens": max_tokens, "messages": messages},
+            )
+            self._last_call = time.monotonic()
+            if resp.status_code == 429 and attempt < self._MAX_RETRIES:
+                time.sleep(backoff)  # rate-limited: wait it out and retry
+                backoff *= 2
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            if "error" in data:  # OpenRouter can return 200 with an embedded error
+                raise RuntimeError(f"LLM gateway error: {data['error']}")
+            return _Response(content=[_TextBlock(text=data["choices"][0]["message"]["content"])])
+        raise RuntimeError("unreachable")  # loop always returns or raises
 
 
 class OpenAICompatClient:
@@ -57,7 +93,45 @@ class OpenAICompatClient:
         self.messages = _OpenAICompatMessages(base_url, api_key)
 
 
-def make_client() -> object:
+class _CachedMessages:
+    def __init__(self, inner: Any, db_path: Path) -> None:
+        self._inner = inner
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(db_path)
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS llm_cache ("
+            "  key TEXT PRIMARY KEY, model TEXT, response TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)"
+        )
+
+    @staticmethod
+    def _key(model: str, max_tokens: int, messages: list[dict[str, Any]]) -> str:
+        blob = json.dumps({"m": model, "t": max_tokens, "msgs": messages}, sort_keys=True)
+        return hashlib.sha256(blob.encode()).hexdigest()
+
+    def create(self, *, model: str, max_tokens: int, messages: list[dict[str, Any]]) -> _Response:
+        key = self._key(model, max_tokens, messages)
+        row = self._conn.execute("SELECT response FROM llm_cache WHERE key = ?", (key,)).fetchone()
+        if row is not None:
+            return _Response(content=[_TextBlock(text=row[0])])
+        resp = self._inner.create(model=model, max_tokens=max_tokens, messages=messages)
+        with self._conn:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO llm_cache (key, model, response) VALUES (?, ?, ?)",
+                (key, model, resp.content[0].text),
+            )
+        return resp
+
+
+class CachedClient:
+    """Wraps any messages-style client with the exact-match response cache."""
+
+    def __init__(self, inner: Any, db_path: Path | None = None) -> None:
+        self.messages = _CachedMessages(
+            inner.messages, db_path or Path(settings.data_dir) / "llm_cache.db"
+        )
+
+
+def make_client(cache: bool = True) -> object:
     """Return an LLM client for the configured provider. Raises if no key is set."""
     if not settings.llm_api_key:
         raise RuntimeError(
@@ -65,7 +139,9 @@ def make_client() -> object:
             "gateway key such as OpenRouter with LLM_BASE_URL)."
         )
     if settings.llm_base_url:
-        return OpenAICompatClient(settings.llm_base_url, settings.llm_api_key)
-    from anthropic import Anthropic
+        client: object = OpenAICompatClient(settings.llm_base_url, settings.llm_api_key)
+    else:
+        from anthropic import Anthropic
 
-    return Anthropic(api_key=settings.llm_api_key)
+        client = Anthropic(api_key=settings.llm_api_key)
+    return CachedClient(client) if cache else client

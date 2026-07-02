@@ -120,3 +120,20 @@ Over the 14 answerable cases attempted (9 answered, 5 abstained):
   pages that state the fact, not just the statement page.
 - Cost so far: ~$0.22 for ~24 calls (15 Sonnet answers + 9 Haiku judgments) — a full 38-case
   scorecard costs roughly $0.50/run. Budget accordingly (M4 makes this a dashboard).
+
+### Pivot to a $0 model stack (same day)
+Student budget → switched to OpenRouter's free models: answers by
+`nvidia/nemotron-3-super-120b-a12b:free`, judge `nvidia/nemotron-nano-9b-v2:free`
+(and `nemotron-nano-12b-v2-vl:free` earmarked for the M2 vision path). Free tiers cap
+*requests/day* (~50), so two efficiency pieces were pulled forward from M4, both tested:
+- **Exact-match response cache** (`llm.py`, SQLite): re-runs and resumed runs pay only for
+  unseen cases. All 33 answerable-case answers are cached; the first re-run replayed them with
+  zero API calls.
+- **Throttle + exponential backoff** for `:free` models (~15 req/min, 429-aware retries).
+
+All 33 answerable cases have (cached) free-model answers: 21 answered / 12 abstained,
+citation accuracy 9/21 = 0.43. Judge verdicts + the 5 unanswerable cases hit the daily cap —
+the same command completes the scorecard after quota reset, paying only for what's missing.
+Early read: the free 120B model abstains more than Sonnet did (12/33 vs ~5/14 on the
+overlapping prefix) and mis-cites more — a model-quality gap the M4 A/B comparison will
+quantify properly.
