@@ -74,10 +74,18 @@ class _OpenAICompatMessages:
         backoff = 10.0
         for attempt in range(self._MAX_RETRIES + 1):
             self._throttle(model)
-            resp = self._client.post(
-                "/chat/completions",
-                json={"model": model, "max_tokens": max_tokens, "messages": messages},
-            )
+            try:
+                resp = self._client.post(
+                    "/chat/completions",
+                    json={"model": model, "max_tokens": max_tokens, "messages": messages},
+                )
+            except httpx.TransportError:  # read timeout / dropped connection: transient
+                self._last_call = time.monotonic()
+                if attempt < self._MAX_RETRIES:
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                raise
             self._last_call = time.monotonic()
             if resp.status_code == 429 and attempt < self._MAX_RETRIES:
                 time.sleep(backoff)  # rate-limited: wait it out and retry

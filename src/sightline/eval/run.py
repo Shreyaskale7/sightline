@@ -105,7 +105,7 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
     from sightline.ingest.store import MetadataStore
     from sightline.retrieval.text_baseline import TextRetriever
 
-    from .judge import Judge
+    from .judge import Judge, numeric_match
 
     cases = load_golden_set(golden_path)
     retriever = TextRetriever()
@@ -118,6 +118,7 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
     n_ans = n_false_abstain = n_cite_hit = n_correct = n_judged = 0
     n_unans = n_abstained_ok = n_attempted = 0
     interrupted: str | None = None
+    judge_dead = False
     try:
         for c in cases:
             hits = retriever.retrieve(c.question, k=k)
@@ -144,13 +145,26 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
             gold = {(p.accession, p.page_no) for p in c.relevant_pages}
             cite_hit = any((ct.accession, ct.page_no) in gold for ct in result.citations)
             n_cite_hit += cite_hit
-            try:
-                correct = judge.is_correct(c.question, c.gold_answer or "", result.answer)
-                n_judged += 1
-                n_correct += correct
-                verdict = "✓" if correct else "✗"
-            except Exception:  # judge quota failure shouldn't lose the answer data
-                verdict = "?"
+            if judge_dead:
+                # LLM judge is quota-dead, but numeric gold answers still grade for free.
+                deterministic = numeric_match(c.gold_answer or "", result.answer)
+                if deterministic is None:
+                    verdict = "?"
+                else:
+                    n_judged += 1
+                    n_correct += deterministic
+                    verdict = "✓" if deterministic else "✗"
+            else:
+                try:
+                    correct = judge.is_correct(c.question, c.gold_answer or "", result.answer)
+                    n_judged += 1
+                    n_correct += correct
+                    verdict = "✓" if correct else "✗"
+                except Exception:
+                    # Circuit breaker: one quota failure means the rest would fail too —
+                    # stop burning retries on every remaining case.
+                    judge_dead = True
+                    verdict = "?"
             console.print(f"  {c.id:32s} cite={'✓' if cite_hit else '✗'} correct={verdict}")
     finally:
         retriever.close()
@@ -170,8 +184,9 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
     table.add_row("answer correctness (judge)", f"{n_correct}/{n_judged or 1} = {n_correct/(n_judged or 1):.2f}")
     table.add_row("abstention recall (unanswerable)", f"{n_abstained_ok}/{n_unans or 1} = {n_abstained_ok/(n_unans or 1):.2f}")
     console.print(table)
-    console.print("[dim]Correctness is graded by an uncalibrated LLM judge (Haiku) — treat as "
-                  "approximate until M3 calibration (Cohen's κ vs human labels).[/dim]")
+    console.print("[dim]Numeric gold answers are graded deterministically (free, exact); prose "
+                  "answers by an uncalibrated LLM judge — treat those as approximate until M3 "
+                  "calibration (Cohen's κ vs human labels).[/dim]")
 
 
 def _print_metrics(per_slice: dict[str, list], n_cases: int, n_unanswerable: int,
