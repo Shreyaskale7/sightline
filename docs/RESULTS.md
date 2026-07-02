@@ -12,15 +12,18 @@ later retrieval config (M2 visual/hybrid) must beat — see the prime directive 
 **Retriever:** dense text only. `BAAI/bge-small-en-v1.5` (384-d, via fastembed/ONNX, CPU),
 cosine similarity in embedded Qdrant. No BM25, no visual, no rerank yet.
 
-**Golden set:** 15 hand-labeled cases (12 answerable + 3 unanswerable), labels grounded in the
-actual ingested pages. Unanswerable cases are held out of the retrieval table (they test
-abstention on the generation side, which doesn't exist yet).
+**Golden set:** 35 hand-labeled cases (30 answerable + 5 unanswerable), every label verified
+against the actual ingested page text. Unanswerable cases are held out of the retrieval table
+(they test abstention on the generation side).
 
 | Slice | n | Recall@5 | nDCG@10 | MRR |
 |---|---:|---:|---:|---:|
-| basic | 10 | 0.700 | 0.519 | 0.458 |
-| cross_company | 2 | 0.000 | 0.185 | 0.113 |
-| **OVERALL** | **12** | **0.583** | **0.464** | **0.401** |
+| basic | 26 | 0.615 | 0.482 | 0.414 |
+| cross_company | 4 | 0.250 | 0.343 | 0.306 |
+| **OVERALL** | **30** | **0.567** | **0.463** | **0.399** |
+
+(First measurement on the initial 15-case set gave OVERALL 0.583/0.464/0.401 — growing the set
+to 35 barely moved the numbers, which is evidence the baseline measurement is stable, not luck.)
 
 ### Reading the numbers
 - **basic (single-page factual) Recall@5 = 0.70.** Dense text finds the right page most of the

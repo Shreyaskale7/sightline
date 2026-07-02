@@ -106,6 +106,155 @@ cases:
       - { accession: "0001045810-26-000021", page_no: 51 }
       - { accession: "0000002488-26-000018", page_no: 61 }
 
+  # --- basic: more financial line items (batch 2, labels verified in-page) --
+  - id: amd-rnd
+    question: "How much did AMD spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$8,091 million."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 61 }
+
+  - id: mu-rnd
+    question: "How much did Micron spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$3,798 million."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 65 }
+
+  - id: intc-rnd
+    question: "How much did Intel spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$13,774 million."
+    relevant_pages:
+      - { accession: "0000050863-26-000011", page_no: 72 }
+
+  - id: nvda-gross-profit
+    question: "What was NVIDIA's gross profit in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$153,463 million."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+
+  - id: nvda-operating-income
+    question: "What was NVIDIA's operating income in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$130,387 million."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 51 }
+
+  - id: amd-net-income
+    question: "What was AMD's net income in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$4,335 million (about $4.3 billion)."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 61 }
+
+  - id: mu-net-income
+    question: "What was Micron's net income in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$8,539 million."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 65 }
+
+  - id: qcom-licensing-revenue
+    question: "How much licensing revenue did Qualcomm report in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$6,415 million."
+    relevant_pages:
+      - { accession: "0000804328-25-000085", page_no: 59 }
+
+  # --- basic: more qualitative (batch 2) -------------------------------------
+  - id: nvda-employees
+    question: "Approximately how many employees did NVIDIA report in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "Approximately 42,000 employees in 38 countries."
+    relevant_pages:
+      - { accession: "0001045810-26-000021", page_no: 11 }
+
+  - id: amd-employees
+    question: "Approximately how many employees did AMD report in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "Approximately 31,000 employees."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 14 }
+
+  - id: intc-employees
+    question: "How many people did Intel report employing in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "85,100 people as of December 27, 2025."
+    relevant_pages:
+      - { accession: "0000050863-26-000011", page_no: 19 }
+
+  - id: qcom-employees
+    question: "Approximately how many workers did Qualcomm report in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "Approximately 52,000 full-time, part-time and temporary workers."
+    relevant_pages:
+      - { accession: "0000804328-25-000085", page_no: 12 }
+
+  - id: qcom-segments
+    question: "What are Qualcomm's main business segments?"
+    slice: basic
+    answerable: true
+    gold_answer: "QCT (Qualcomm CDMA Technologies, semiconductors), QTL (Qualcomm Technology Licensing), and QSI (strategic investments)."
+    relevant_pages:
+      - { accession: "0000804328-25-000085", page_no: 5 }
+
+  - id: mu-headquarters
+    question: "Where is Micron's headquarters located?"
+    slice: basic
+    answerable: true
+    gold_answer: "8000 S. Federal Way, Boise, Idaho."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 1 }
+
+  - id: amd-zt-acquisition
+    question: "What did AMD pay to acquire ZT Systems according to its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$3.2 billion in cash plus 8.3 million shares of AMD common stock."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 51 }
+
+  - id: intc-18a
+    question: "What new process technology did Intel ramp into high-volume production in 2025?"
+    slice: basic
+    answerable: true
+    gold_answer: "Intel 18A."
+    relevant_pages:
+      - { accession: "0000050863-26-000011", page_no: 9 }
+
+  # --- cross_company (batch 2) -----------------------------------------------
+  - id: mu-qcom-revenue-compare
+    question: "Whose total revenue was larger in the most recent 10-K, Micron's or Qualcomm's?"
+    slice: cross_company
+    answerable: true
+    gold_answer: "Qualcomm's ($44,284M) was larger than Micron's ($37,378M)."
+    relevant_pages:
+      - { accession: "0000723125-25-000028", page_no: 65 }
+      - { accession: "0000804328-25-000085", page_no: 59 }
+
+  - id: amd-intc-rnd-compare
+    question: "Which company spent more on R&D in its most recent 10-K, AMD or Intel, and by roughly how much?"
+    slice: cross_company
+    answerable: true
+    gold_answer: "Intel ($13,774M) spent more than AMD ($8,091M) — about $5,683M more."
+    relevant_pages:
+      - { accession: "0000002488-26-000018", page_no: 61 }
+      - { accession: "0000050863-26-000011", page_no: 72 }
+
   # --- unanswerable: the system should ABSTAIN, not guess -------------------
   - id: unanswerable-ceo-salary-2005
     question: "What was NVIDIA's CEO's exact salary in 2005 according to these filings?"
@@ -125,5 +274,19 @@ cases:
     question: "What is NVIDIA's projected total revenue for fiscal year 2030?"
     slice: unanswerable
     answerable: false   # forward guidance not disclosed in the filing
+    gold_answer: null
+    relevant_pages: []
+
+  - id: unanswerable-avgo-revenue
+    question: "What was Broadcom's total revenue in its most recent 10-K?"
+    slice: unanswerable
+    answerable: false   # Broadcom (AVGO) is not in this corpus
+    gold_answer: null
+    relevant_pages: []
+
+  - id: unanswerable-nvda-stock-price
+    question: "What was NVIDIA's closing stock price on June 1, 2026?"
+    slice: unanswerable
+    answerable: false   # market data, not disclosed in a 10-K
     gold_answer: null
     relevant_pages: []
