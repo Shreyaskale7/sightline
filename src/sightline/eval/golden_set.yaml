@@ -14,6 +14,12 @@ cases:
     gold_answer: "$215,938 million (about $216.0 billion)."
     relevant_pages:
       - { accession: "0001045810-26-000021", page_no: 51 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000021", page_no: 37 }
+      - { accession: "0001045810-26-000021", page_no: 40 }
+      - { accession: "0001045810-26-000021", page_no: 77 }
+      - { accession: "0001045810-26-000021", page_no: 78 }
+      - { accession: "0001045810-26-000021", page_no: 79 }
 
   - id: amd-revenue
     question: "What was AMD's net revenue in its most recent 10-K?"
@@ -22,6 +28,11 @@ cases:
     gold_answer: "$34,639 million."
     relevant_pages:
       - { accession: "0000002488-26-000018", page_no: 61 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000002488-26-000018", page_no: 55 }
+      - { accession: "0000002488-26-000018", page_no: 56 }
+      - { accession: "0000002488-26-000018", page_no: 75 }
+      - { accession: "0000002488-26-000018", page_no: 76 }
 
   - id: intc-revenue
     question: "What was Intel's net revenue in its most recent 10-K?"
@@ -30,6 +41,10 @@ cases:
     gold_answer: "$52,853 million."
     relevant_pages:
       - { accession: "0000050863-26-000011", page_no: 72 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000050863-26-000011", page_no: 33 }
+      - { accession: "0000050863-26-000011", page_no: 86 }
+      - { accession: "0000050863-26-000011", page_no: 87 }
 
   - id: mu-revenue
     question: "What was Micron's total revenue in its most recent 10-K?"
@@ -38,6 +53,12 @@ cases:
     gold_answer: "$37,378 million."
     relevant_pages:
       - { accession: "0000723125-25-000028", page_no: 65 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000723125-25-000028", page_no: 53 }
+      - { accession: "0000723125-25-000028", page_no: 54 }
+      - { accession: "0000723125-25-000028", page_no: 90 }
+      - { accession: "0000723125-25-000028", page_no: 96 }
+      - { accession: "0000723125-25-000028", page_no: 99 }
 
   - id: qcom-revenue
     question: "What were Qualcomm's total revenues in its most recent 10-K?"
@@ -46,6 +67,9 @@ cases:
     gold_answer: "$44,284 million."
     relevant_pages:
       - { accession: "0000804328-25-000085", page_no: 59 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000804328-25-000085", page_no: 39 }
+      - { accession: "0000804328-25-000085", page_no: 81 }
 
   - id: nvda-rnd
     question: "How much did NVIDIA spend on research and development in its most recent 10-K?"
@@ -54,6 +78,8 @@ cases:
     gold_answer: "$18,497 million."
     relevant_pages:
       - { accession: "0001045810-26-000021", page_no: 51 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000021", page_no: 41 }
 
   - id: intc-operating-result
     question: "Did Intel report operating income or an operating loss in its most recent 10-K, and how much?"
@@ -62,6 +88,10 @@ cases:
     gold_answer: "An operating loss of $2,214 million."
     relevant_pages:
       - { accession: "0000050863-26-000011", page_no: 72 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000050863-26-000011", page_no: 33 }
+      - { accession: "0000050863-26-000011", page_no: 86 }
+      - { accession: "0000050863-26-000011", page_no: 109 }
 
   - id: qcom-rnd
     question: "How much did Qualcomm spend on research and development in its most recent 10-K?"
@@ -70,6 +100,8 @@ cases:
     gold_answer: "$9,042 million."
     relevant_pages:
       - { accession: "0000804328-25-000085", page_no: 59 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000804328-25-000085", page_no: 39 }
 
   # --- basic: single-page qualitative ---------------------------------------
   - id: nvda-foundry
@@ -97,6 +129,8 @@ cases:
     relevant_pages:
       - { accession: "0001045810-26-000021", page_no: 51 }
       - { accession: "0000050863-26-000011", page_no: 72 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000021", page_no: 41 }
 
   - id: nvda-amd-revenue-compare
     question: "Whose revenue was larger in the most recent 10-K, NVIDIA's or AMD's?"
@@ -106,6 +140,12 @@ cases:
     relevant_pages:
       - { accession: "0001045810-26-000021", page_no: 51 }
       - { accession: "0000002488-26-000018", page_no: 61 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000021", page_no: 37 }
+      - { accession: "0001045810-26-000021", page_no: 40 }
+      - { accession: "0001045810-26-000021", page_no: 77 }
+      - { accession: "0001045810-26-000021", page_no: 78 }
+      - { accession: "0001045810-26-000021", page_no: 79 }
 
   # --- basic: more financial line items (batch 2, labels verified in-page) --
   - id: amd-rnd
@@ -115,6 +155,8 @@ cases:
     gold_answer: "$8,091 million."
     relevant_pages:
       - { accession: "0000002488-26-000018", page_no: 61 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000002488-26-000018", page_no: 56 }
 
   - id: mu-rnd
     question: "How much did Micron spend on research and development in its most recent 10-K?"
@@ -123,6 +165,9 @@ cases:
     gold_answer: "$3,798 million."
     relevant_pages:
       - { accession: "0000723125-25-000028", page_no: 65 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000723125-25-000028", page_no: 53 }
+      - { accession: "0000723125-25-000028", page_no: 96 }
 
   - id: intc-rnd
     question: "How much did Intel spend on research and development in its most recent 10-K?"
@@ -131,6 +176,8 @@ cases:
     gold_answer: "$13,774 million."
     relevant_pages:
       - { accession: "0000050863-26-000011", page_no: 72 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000050863-26-000011", page_no: 33 }
 
   - id: nvda-gross-profit
     question: "What was NVIDIA's gross profit in its most recent 10-K?"
@@ -147,6 +194,8 @@ cases:
     gold_answer: "$130,387 million."
     relevant_pages:
       - { accession: "0001045810-26-000021", page_no: 51 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000021", page_no: 37 }
 
   - id: amd-net-income
     question: "What was AMD's net income in its most recent 10-K?"
@@ -155,6 +204,11 @@ cases:
     gold_answer: "$4,335 million (about $4.3 billion)."
     relevant_pages:
       - { accession: "0000002488-26-000018", page_no: 61 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000002488-26-000018", page_no: 62 }
+      - { accession: "0000002488-26-000018", page_no: 64 }
+      - { accession: "0000002488-26-000018", page_no: 65 }
+      - { accession: "0000002488-26-000018", page_no: 86 }
 
   - id: mu-net-income
     question: "What was Micron's net income in its most recent 10-K?"
@@ -163,6 +217,12 @@ cases:
     gold_answer: "$8,539 million."
     relevant_pages:
       - { accession: "0000723125-25-000028", page_no: 65 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000723125-25-000028", page_no: 53 }
+      - { accession: "0000723125-25-000028", page_no: 66 }
+      - { accession: "0000723125-25-000028", page_no: 68 }
+      - { accession: "0000723125-25-000028", page_no: 69 }
+      - { accession: "0000723125-25-000028", page_no: 95 }
 
   - id: qcom-licensing-revenue
     question: "How much licensing revenue did Qualcomm report in its most recent 10-K?"
@@ -171,6 +231,8 @@ cases:
     gold_answer: "$6,415 million."
     relevant_pages:
       - { accession: "0000804328-25-000085", page_no: 59 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000804328-25-000085", page_no: 39 }
 
   # --- basic: more qualitative (batch 2) -------------------------------------
   - id: nvda-employees
@@ -220,6 +282,8 @@ cases:
     gold_answer: "8000 S. Federal Way, Boise, Idaho."
     relevant_pages:
       - { accession: "0000723125-25-000028", page_no: 1 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000723125-25-000028", page_no: 22 }
 
   - id: amd-zt-acquisition
     question: "What did AMD pay to acquire ZT Systems according to its most recent 10-K?"
@@ -250,6 +314,13 @@ cases:
       - { accession: "0001045810-25-000209", page_no: 3 }
       - { accession: "0001045810-25-000230", page_no: 3 }
       - { accession: "0001045810-26-000052", page_no: 3 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0001045810-26-000052", page_no: 19 }
+      - { accession: "0001045810-26-000052", page_no: 20 }
+      - { accession: "0001045810-26-000052", page_no: 21 }
+      - { accession: "0001045810-26-000052", page_no: 24 }
+      - { accession: "0001045810-26-000052", page_no: 25 }
+      - { accession: "0001045810-26-000052", page_no: 26 }
 
   - id: amd-quarterly-revenue-trend
     question: "How did AMD's quarterly net revenue change across its last three 10-Q filings?"
@@ -260,6 +331,10 @@ cases:
       - { accession: "0000002488-25-000108", page_no: 3 }
       - { accession: "0000002488-25-000166", page_no: 3 }
       - { accession: "0000002488-26-000076", page_no: 3 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000002488-26-000076", page_no: 11 }
+      - { accession: "0000002488-26-000076", page_no: 25 }
+      - { accession: "0000002488-26-000076", page_no: 27 }
 
   - id: mu-quarterly-revenue-trend
     question: "Did Micron's quarterly revenue increase or decrease across its last three 10-Q filings?"
@@ -280,6 +355,9 @@ cases:
     relevant_pages:
       - { accession: "0000723125-25-000028", page_no: 65 }
       - { accession: "0000804328-25-000085", page_no: 59 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000804328-25-000085", page_no: 39 }
+      - { accession: "0000804328-25-000085", page_no: 81 }
 
   - id: amd-intc-rnd-compare
     question: "Which company spent more on R&D in its most recent 10-K, AMD or Intel, and by roughly how much?"
@@ -289,6 +367,8 @@ cases:
     relevant_pages:
       - { accession: "0000002488-26-000018", page_no: 61 }
       - { accession: "0000050863-26-000011", page_no: 72 }
+    also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
+      - { accession: "0000050863-26-000011", page_no: 33 }
 
   # --- unanswerable: the system should ABSTAIN, not guess -------------------
   - id: unanswerable-ceo-salary-2005

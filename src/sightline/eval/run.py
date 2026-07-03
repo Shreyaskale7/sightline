@@ -248,7 +248,11 @@ def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
                 n_false_abstain += 1
                 console.print(f"  {c.id:32s} [yellow]abstained (should answer)[/yellow]")
                 continue
-            gold = {(p.accession, p.page_no) for p in c.relevant_pages}
+            # A citation is correct if it points at ANY page that states the fact —
+            # the canonical gold pages or the mined alternates (also_valid_pages).
+            gold = {(p.accession, p.page_no) for p in c.relevant_pages} | {
+                (p.accession, p.page_no) for p in c.also_valid_pages
+            }
             cite_hit = any((ct.accession, ct.page_no) in gold for ct in result.citations)
             n_cite_hit += cite_hit
             if judge_dead:
