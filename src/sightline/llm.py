@@ -40,6 +40,9 @@ class _TextBlock:
 @dataclass
 class _Response:
     content: list[_TextBlock]
+    # Token usage as reported by the provider (M4 cost accounting reads this).
+    # None = unknown; cache hits deliberately report zero-cost usage.
+    usage: dict[str, Any] | None = None
 
 
 class _OpenAICompatMessages:
@@ -95,7 +98,10 @@ class _OpenAICompatMessages:
             data = resp.json()
             if "error" in data:  # OpenRouter can return 200 with an embedded error
                 raise RuntimeError(f"LLM gateway error: {data['error']}")
-            return _Response(content=[_TextBlock(text=data["choices"][0]["message"]["content"])])
+            return _Response(
+                content=[_TextBlock(text=data["choices"][0]["message"]["content"])],
+                usage=data.get("usage"),
+            )
         raise RuntimeError("unreachable")  # loop always returns or raises
 
 
@@ -125,7 +131,9 @@ class _CachedMessages:
         key = self._key(model, max_tokens, messages)
         row = self._conn.execute("SELECT response FROM llm_cache WHERE key = ?", (key,)).fetchone()
         if row is not None:
-            return _Response(content=[_TextBlock(text=row[0])])
+            # Zero-cost usage: a cache hit spends nothing, and the dashboard should show that.
+            return _Response(content=[_TextBlock(text=row[0])],
+                             usage={"prompt_tokens": 0, "completion_tokens": 0, "cached": True})
         resp = self._inner.create(model=model, max_tokens=max_tokens, messages=messages)
         with self._conn:
             self._conn.execute(

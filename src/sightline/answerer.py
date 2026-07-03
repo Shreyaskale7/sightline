@@ -190,6 +190,7 @@ class Answerer:
             result = parse_answer(resp.content[0].text)
             s["abstained"] = result.abstained
             s["n_citations"] = len(result.citations)
+            s["usage"] = getattr(resp, "usage", None)
         return result
 
     def answer_from_images(
@@ -216,4 +217,5 @@ class Answerer:
             result = parse_answer(resp.content[0].text)
             s["abstained"] = result.abstained
             s["n_citations"] = len(result.citations)
+            s["usage"] = getattr(resp, "usage", None)
         return result
