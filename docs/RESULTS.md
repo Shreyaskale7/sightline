@@ -92,6 +92,27 @@ python -m sightline.eval.run --ablation
 
 **M2 target:** beat dense-only Recall@5 = 0.313 / nDCG@10 = 0.267 on this corpus and golden set.
 
+## Metadata filtering: the free +61% (2026-07-03)
+
+The corpus-growth regression (finding 1 above) had a deterministic cause — so it got a
+deterministic fix. `retrieval/filters.py` parses company and form-type mentions out of the
+question with plain string matching ("…in its most recent 10-K", "NVIDIA or Intel") and
+restricts vector search via Qdrant payload filters (`ticker`, `form`) that ingestion already
+stored. No model, no API, ~60 lines, fully explainable.
+
+| Config | Recall@5 | nDCG@10 | MRR |
+|---|---:|---:|---:|
+| dense (unfiltered) | 0.313 | 0.267 | 0.192 |
+| **dense + metadata filter** | **0.505** | **0.425** | **0.364** |
+
+Per-slice R@5: basic 0.346→0.577 (nearly recovers the pre-growth 0.615), multi_hop
+0.111→0.222 (doubled), cross_company unchanged at 0.250 (needs decomposition, not filtering).
+
+Lesson recorded: before reaching for a bigger model, encode the metadata you already have.
+Out-of-corpus mentions (e.g. Broadcom) deliberately yield NO filter — the question stays
+corpus-wide and abstention handles it downstream. M3's NER-based anchoring must beat this
+deterministic baseline to ship. **New M2 bar: visual/hybrid must beat R@5 0.505.**
+
 ## First generation scorecard — PARTIAL (2026-07-02)
 
 **Setup:** answers by `anthropic/claude-sonnet-4.5`, judged by `anthropic/claude-haiku-4.5`,

@@ -133,13 +133,19 @@ class TextRetriever:
         self._client.upsert(self.collection, points=points)
         return len(points)
 
-    def retrieve(self, query: str, k: int = 5) -> list[Hit]:
-        """Return the top-k pages for a query, best first."""
+    def retrieve(self, query: str, k: int = 5, query_filter: object | None = None) -> list[Hit]:
+        """Return the top-k pages for a query, best first.
+
+        `query_filter` is an optional Qdrant Filter (see retrieval/filters.py) restricting
+        the search by payload — e.g. only NVDA 10-K pages when the question names them.
+        """
         self._ensure()
         if not self._client.collection_exists(self.collection):
             return []
         qvec = self._embed_query(query)
-        res = self._client.query_points(self.collection, query=qvec, limit=k).points
+        res = self._client.query_points(
+            self.collection, query=qvec, limit=k, query_filter=query_filter
+        ).points
         return [
             Hit(
                 accession=p.payload["accession"],
