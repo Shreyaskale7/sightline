@@ -14,8 +14,14 @@ late-interaction visual retrieval (the ColPali / ColQwen family). The differenti
 RAG project is the **evaluation harness**: everything is measured, and every improvement is proven.
 
 ## Status
-Milestone 0 (scaffold) is mostly done. Next up: **Milestone 1 — a text-only baseline plus the eval
-harness.** Build and measure the boring version before adding visual retrieval. See `CLAUDE.md`.
+**M1 (text baseline + eval harness): built and measured.** Corpus: 20 SEC filings / 1,329 page
+images across NVDA, AMD, INTC, MU, QCOM. Golden set: 38 hand-verified cases. Text-only dense
+retrieval baseline: **Recall@5 0.313** — with two measured negative findings along the way
+(BM25 hurts on table-heavy gold pages; the text baseline degrades 0.567→0.313 as the corpus
+grows 2.6×). Generation (cited answers + abstention) runs on a $0 free-model stack with a
+response cache. **M2 (visual retrieval) in progress:** ColModernVBERT late-interaction
+retriever + cross-encoder reranker scaffolded; the six-way ablation is next.
+Full numbers and history: `docs/RESULTS.md`.
 
 ## Quickstart
 ```bash
