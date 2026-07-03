@@ -158,3 +158,33 @@ the same command completes the scorecard after quota reset, paying only for what
 Early read: the free 120B model abstains more than Sonnet did (12/33 vs ~5/14 on the
 overlapping prefix) and mis-cites more — a model-quality gap the M4 A/B comparison will
 quantify properly.
+
+## ✅ M1 COMPLETE — final generation scorecard (2026-07-03)
+
+Answer model `nvidia/nemotron-3-super-120b-a12b:free`; judge = deterministic numeric matcher
+for figure answers + `nemotron-nano-9b-v2:free` for prose. Retrieval: dense top-5
+(unfiltered — the M1 baseline config). Total M1 spend: **$0.22** (the early Sonnet run);
+the final scorecard itself cost $0.
+
+| Metric | Value |
+|---|---:|
+| answer correctness | 13/20 = **0.65** |
+| citation accuracy (of answered) | 9/21 = **0.43** |
+| false abstentions (answerable) | 12/33 = 0.36 |
+| **abstention recall (unanswerable)** | **4/5 = 0.80** |
+
+Readings:
+- **Grounding discipline works.** Every false abstention maps to a retrieval miss — the model
+  refuses rather than invents when the right page isn't in front of it. Fixing retrieval
+  (M2: the metadata filter alone took R@5 0.313→0.505) should convert most refusals into
+  correct answers. Generation is retrieval-bound.
+- **The one honesty failure** (`nvda-stock-price`): asked for a stock price on a specific
+  date, the model answered from the 10-K's stock-performance disclosure instead of abstaining
+  — plausible-page-but-wrong-question, exactly the case the M3 LLM support-checker targets.
+- Citation accuracy (0.43) under-measures: several "misses" cite a *different* page that also
+  contains the fact (income statement vs MD&A). Action item stands: gold labels should list
+  all pages stating the fact.
+
+M1 is done: ingestion, text baseline, eval harness (retrieval + generation + abstention),
+all measured. M2's job: beat R@5 0.505 (dense+filter) with visual/hybrid, then re-run this
+scorecard on the winning config.

@@ -26,14 +26,15 @@ the corpus can't support an answer.
 - Prefer a smaller, correct, fully-understood implementation over a larger one the human can't explain.
 
 ## Milestone roadmap and current status
-- [~] **M0 — Scaffold**: repo structure, docker-compose, config, tracing hook, FastAPI stub, EDGAR
+- [x] **M0 — Scaffold**: repo structure, docker-compose, config, tracing hook, FastAPI stub, EDGAR
   client skeleton, eval-harness skeleton. (This scaffold delivers most of M0.)
-- [ ] **M1 — Text-only baseline + eval harness**: ingest ~5 companies, rasterize pages, extract
-  text, dense text retrieval, LLM answer with citations, and a working eval harness with a
-  hand-labeled golden set (~30 → 150 cases). **Measure the baseline.** This is the priority.
-- [ ] **M2 — Visual + hybrid retrieval**: ColQwen/ColModernVBERT page-image embeddings in Qdrant,
-  BM25 + dense + visual fused via Reciprocal Rank Fusion, cross-encoder rerank, two-stage retrieve.
-  Produce the ablation table.
+- [x] **M1 — Text-only baseline + eval harness**: ✅ done 2026-07-03. 20 filings / 1,329 pages
+  (NVDA/AMD/INTC/MU/QCOM 10-Ks + 10-Qs); 38-case golden set; retrieval R@5 0.313 dense /
+  **0.505 dense+metadata-filter**; generation correctness 0.65, citation 0.43, abstention
+  recall 0.80 — all on a $0 free-model stack. Full history in `docs/RESULTS.md`.
+- [~] **M2 — Visual + hybrid retrieval**: ColModernVBERT retriever, RRF fusion, cross-encoder
+  rerank, and the visual answer path are built and smoke-tested; full visual index + the
+  ablation table are in progress. Bar to beat: R@5 0.505.
 - [ ] **M3 — Agents + grounding**: LangGraph router → planner → answerer → verifier → synthesis;
   table-QA path; NER for citation anchoring; LLM-as-judge calibrated against human labels (Cohen's κ).
 - [ ] **M4 — LLMOps**: cost/latency dashboard + money-shot metric, prompt registry, CI eval gate,

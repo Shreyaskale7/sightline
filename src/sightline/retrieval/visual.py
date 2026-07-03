@@ -119,17 +119,40 @@ class VisualRetriever:
             )
 
     # --- API -----------------------------------------------------------------
+    def _existing_ids(self) -> set[str]:
+        """Point ids already in the collection — lets index() resume instead of re-embed."""
+        self._ensure_client()
+        if not self._client.collection_exists(self.collection):
+            return set()
+        ids: set[str] = set()
+        offset = None
+        while True:
+            points, offset = self._client.scroll(
+                self.collection, limit=1000, offset=offset,
+                with_payload=False, with_vectors=False,
+            )
+            ids.update(str(p.id) for p in points)
+            if offset is None:
+                return ids
+
     def index(self, pages: Iterable, progress_every: int = 25) -> int:
-        """Embed page images and upsert. Idempotent on (accession, page_no).
+        """Embed page images and upsert. Idempotent AND resumable on (accession, page_no).
 
         `pages` = objects with .accession, .page_no, .image_path (+ optional .ticker/.form),
-        e.g. store.StoredPage. Batches keep CPU memory bounded; upserting per batch means an
-        interrupted run resumes where it left off (already-upserted pages are just re-skipped
-        by deterministic ids).
+        e.g. store.StoredPage. Pages already in the collection are skipped entirely (embedding
+        is the expensive part — a killed run loses at most one batch). Batches keep CPU memory
+        bounded; per-batch upserts persist progress as it happens.
         """
         from qdrant_client.models import PointStruct
 
-        pages = [p for p in pages if Path(p.image_path).exists()]
+        done_ids = self._existing_ids()
+        pages = [
+            p for p in pages
+            if Path(p.image_path).exists() and _point_id(p.accession, p.page_no) not in done_ids
+        ]
+        if done_ids:
+            print(f"[visual-index] resuming: {len(done_ids)} pages already indexed, "
+                  f"{len(pages)} to go", flush=True)
         if not pages:
             return 0
 
