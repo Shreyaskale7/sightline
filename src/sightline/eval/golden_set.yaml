@@ -301,6 +301,85 @@ cases:
     relevant_pages:
       - { accession: "0000050863-26-000011", page_no: 9 }
 
+  # --- basic: quarterly (10-Q) coverage — batch 3 ----------------------------
+  # 975 of the corpus's 1,329 pages are 10-Qs; these cases make the exam cover them.
+  # All figures verified in-context (incl. catching Intel's parenthesized loss).
+  - id: nvda-q-revenue
+    question: "What was NVIDIA's revenue in its most recent 10-Q (latest quarter)?"
+    slice: basic
+    answerable: true
+    gold_answer: "$81,615 million for the quarter."
+    relevant_pages:
+      - { accession: "0001045810-26-000052", page_no: 3 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0001045810-26-000052", page_no: 19 }
+      - { accession: "0001045810-26-000052", page_no: 20 }
+      - { accession: "0001045810-26-000052", page_no: 21 }
+      - { accession: "0001045810-26-000052", page_no: 24 }
+      - { accession: "0001045810-26-000052", page_no: 25 }
+      - { accession: "0001045810-26-000052", page_no: 26 }
+
+  - id: amd-q-net-income
+    question: "What was AMD's net income in its most recent 10-Q (latest quarter)?"
+    slice: basic
+    answerable: true
+    gold_answer: "$1,383 million for the quarter."
+    relevant_pages:
+      - { accession: "0000002488-26-000076", page_no: 3 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0000002488-26-000076", page_no: 4 }
+      - { accession: "0000002488-26-000076", page_no: 6 }
+      - { accession: "0000002488-26-000076", page_no: 8 }
+      - { accession: "0000002488-26-000076", page_no: 20 }
+
+  - id: intc-q-result
+    question: "Did Intel report a net income or a net loss in its most recent 10-Q, and how much?"
+    slice: basic
+    answerable: true
+    gold_answer: "A net loss — $(3,728) million attributable to Intel ($(4,281) million including non-controlling interests)."
+    relevant_pages:
+      - { accession: "0000050863-26-000079", page_no: 6 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0000050863-26-000079", page_no: 7 }
+      - { accession: "0000050863-26-000079", page_no: 8 }
+      - { accession: "0000050863-26-000079", page_no: 10 }
+      - { accession: "0000050863-26-000079", page_no: 12 }
+      - { accession: "0000050863-26-000079", page_no: 18 }
+      - { accession: "0000050863-26-000079", page_no: 44 }
+
+  - id: mu-q-revenue
+    question: "What was Micron's revenue in its most recent 10-Q (latest quarter)?"
+    slice: basic
+    answerable: true
+    gold_answer: "$41,456 million for the quarter."
+    relevant_pages:
+      - { accession: "0000723125-26-000015", page_no: 5 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0000723125-26-000015", page_no: 21 }
+      - { accession: "0000723125-26-000015", page_no: 24 }
+      - { accession: "0000723125-26-000015", page_no: 28 }
+      - { accession: "0000723125-26-000015", page_no: 29 }
+
+  - id: mu-q-eps
+    question: "What was Micron's basic earnings per share in its most recent 10-Q (latest quarter)?"
+    slice: basic
+    answerable: true
+    gold_answer: "$25.03 basic EPS for the quarter."
+    relevant_pages:
+      - { accession: "0000723125-26-000015", page_no: 5 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0000723125-26-000015", page_no: 22 }
+
+  - id: qcom-q-rnd
+    question: "How much did Qualcomm spend on research and development in its most recent 10-Q (latest quarter)?"
+    slice: basic
+    answerable: true
+    gold_answer: "$2,463 million for the quarter."
+    relevant_pages:
+      - { accession: "0000804328-26-000061", page_no: 5 }
+    also_valid_pages:  # other pages stating the same fact (mined); citation-grading only
+      - { accession: "0000804328-26-000061", page_no: 20 }
+
   # --- multi_hop: needs pages from THREE quarterly filings -------------------
   # (Unlocked by ingesting 10-Qs. Hard by design: one query must surface pages
   #  from three different filings. Expect low retrieval scores — that gap is the
