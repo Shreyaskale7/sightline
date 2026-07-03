@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sightline — answers you can see</title>
+<meta name="description" content="Visual-first document intelligence over SEC filings. Answers cite the actual page image — or honestly abstain.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>👁️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070f;
+    --bg-soft: #0b0f1d;
+    --panel: rgba(255,255,255,.03);
+    --border: rgba(255,255,255,.08);
+    --text: #e8ecf4;
+    --muted: #8a93a8;
+    --accent: #6d8dff;
+    --accent-2: #38e1c6;
+    --green: #2ea86b;
+    --amber: #d9a13c;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ambient glows */
+  .glow { position: fixed; border-radius: 50%; filter: blur(120px); pointer-events: none; z-index: 0; }
+  .glow.a { width: 640px; height: 640px; top: -220px; left: -160px; background: rgba(109,141,255,.14); }
+  .glow.b { width: 520px; height: 520px; top: 30%; right: -200px; background: rgba(56,225,198,.08); }
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 30%, transparent 75%);
+  }
+  main, nav, footer { position: relative; z-index: 1; }
+
+  nav {
+    max-width: 1120px; margin: 0 auto; padding: 1.4rem 1.5rem;
+    display: flex; align-items: center; gap: 1.4rem;
+  }
+  .logo { font-weight: 800; font-size: 1.25rem; letter-spacing: -.02em; }
+  .logo .dot { color: var(--accent); }
+  nav .links { margin-left: auto; display: flex; align-items: center; gap: 1.6rem; font-size: .92rem; color: var(--muted); }
+  nav .links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .7rem 1.3rem; border-radius: 10px; font-weight: 600; font-size: .95rem;
+    border: 1px solid var(--border); transition: all .18s ease; cursor: pointer;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), #8a6dff);
+    border: none; color: #fff;
+    box-shadow: 0 8px 30px rgba(109,141,255,.35);
+  }
+  .btn.primary:hover { transform: translateY(-1px); box-shadow: 0 12px 38px rgba(109,141,255,.45); }
+  .btn.ghost:hover { background: var(--panel); }
+
+  /* hero */
+  .hero { max-width: 1120px; margin: 0 auto; padding: 5.5rem 1.5rem 4rem; text-align: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .8rem; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: .4rem 1rem;
+    margin-bottom: 1.6rem; background: var(--panel);
+  }
+  .pill .live { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 4.2rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.06;
+  }
+  h1 .grad {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead {
+    max-width: 620px; margin: 1.4rem auto 2.2rem; color: var(--muted);
+    font-size: 1.15rem; line-height: 1.65;
+  }
+  .hero .cta { display: flex; gap: .9rem; justify-content: center; flex-wrap: wrap; }
+
+  /* stats band */
+  .stats {
+    max-width: 1120px; margin: 3.5rem auto 0; padding: 0 1.5rem;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+    background: var(--border); border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .stat { background: var(--bg-soft); padding: 1.5rem 1.2rem; text-align: center; }
+  .stat b { display: block; font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; }
+  .stat span { font-size: .8rem; color: var(--muted); }
+  .stat b em { font-style: normal; color: var(--accent-2); }
+
+  section { max-width: 1120px; margin: 0 auto; padding: 4.5rem 1.5rem 0; }
+  .kicker { color: var(--accent); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+  h2 { font-size: clamp(1.6rem, 3.4vw, 2.3rem); font-weight: 800; letter-spacing: -.02em; margin: .6rem 0 .8rem; }
+  .sub { color: var(--muted); max-width: 560px; line-height: 1.65; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin-top: 2.2rem; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.8rem; transition: border-color .2s, transform .2s;
+  }
+  .card:hover { border-color: rgba(109,141,255,.35); transform: translateY(-3px); }
+  .card .ico {
+    width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(109,141,255,.2), rgba(56,225,198,.12));
+    font-size: 1.2rem; margin-bottom: 1.1rem;
+  }
+  .card h3 { font-size: 1.08rem; margin-bottom: .5rem; }
+  .card p { color: var(--muted); font-size: .93rem; line-height: 1.6; }
+
+  /* pipeline */
+  .pipe { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: 2rem; }
+  .stage {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: .85rem 1.2rem; font-size: .9rem;
+  }
+  .stage b { display: block; font-size: .95rem; }
+  .stage span { color: var(--muted); font-size: .78rem; }
+  .arrow { color: var(--accent); font-weight: 700; }
+
+  /* measured table */
+  .measure {
+    margin-top: 2.2rem; border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; background: var(--bg-soft);
+  }
+  .measure table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  .measure th, .measure td { text-align: left; padding: .95rem 1.4rem; border-bottom: 1px solid var(--border); }
+  .measure th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .measure tr:last-child td { border-bottom: none; }
+  .measure td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .up { color: var(--accent-2); }
+  .down { color: var(--amber); }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 1rem; line-height: 1.6; }
+
+  footer {
+    max-width: 1120px; margin: 5rem auto 0; padding: 2.2rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
+    color: var(--muted); font-size: .88rem;
+  }
+  footer a { color: var(--accent); }
+
+  .fade { opacity: 0; transform: translateY(14px); animation: fade .7s ease forwards; }
+  .fade.d1 { animation-delay: .08s; } .fade.d2 { animation-delay: .16s; }
+  .fade.d3 { animation-delay: .24s; } .fade.d4 { animation-delay: .32s; }
+  @keyframes fade { to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="glow a"></div><div class="glow b"></div><div class="grid-bg"></div>
+
+<nav>
+  <a class="logo" href="/">Sightline<span class="dot">.</span></a>
+  <div class="links">
+    <a href="#how">How it works</a>
+    <a href="#measured">Measured</a>
+    <a href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn primary" href="/app">Launch console →</a>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <div class="pill fade"><span class="live"></span> Live over 20 SEC filings · 1,329 page images</div>
+    <h1 class="fade d1">Ask your filings anything.<br><span class="grad">Get answers you can see.</span></h1>
+    <p class="lead fade d2">
+      Sightline reads SEC filings the way an analyst does — page by page, tables and all.
+      Every answer cites the <b>actual page image</b> it came from. And when the documents
+      can't support an answer, it says so instead of guessing.
+    </p>
+    <div class="cta fade d3">
+      <a class="btn primary" href="/app">Ask a question →</a>
+      <a class="btn ghost" href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">View the source</a>
+    </div>
+  </div>
+
+  <div class="stats fade d4">
+    <div class="stat"><b>1,329</b><span>page images indexed</span></div>
+    <div class="stat"><b>20</b><span>SEC filings (10-K + 10-Q)</span></div>
+    <div class="stat"><b><em>+61%</em></b><span>retrieval lift, measured</span></div>
+    <div class="stat"><b>0.80</b><span>abstention recall</span></div>
+    <div class="stat"><b>$0.22</b><span>total build spend</span></div>
+  </div>
+
+  <section id="how">
+    <div class="kicker">How it works</div>
+    <h2>Evidence, not vibes.</h2>
+    <p class="sub">Four stages, each one measured before it shipped. A question never becomes an answer without surviving all of them.</p>
+    <div class="pipe">
+      <div class="stage"><b>Route</b><span>classify the question's shape</span></div>
+      <span class="arrow">→</span>
+      <div class="stage"><b>Retrieve</b><span>filtered search, fan-out per company/filing</span></div>
+      <span class="arrow">→</span>
+      <div class="stage"><b>Answer</b><span>grounded on retrieved pages only</span></div>
+      <span class="arrow">→</span>
+      <div class="stage"><b>Verify</b><span>uncited claims don't ship</span></div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="ico">🖼️</div>
+        <h3>Citations you can look at</h3>
+        <p>Every claim links to the page image it came from — rendered inline. You never have to trust
+        “see page 51”; page 51 is right there.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🛡️</div>
+        <h3>Honest by design</h3>
+        <p>A deterministic verifier strips fabricated citations and forces “I don't know” on unsupported answers.
+        It refused 4 of 5 deliberately impossible questions in evaluation.</p>
+      </div>
+      <div class="card">
+        <div class="ico">👁️</div>
+        <h3>Visual-first retrieval</h3>
+        <p>Financial pages are tables, footnotes, charts — layout that OCR destroys. Sightline embeds
+        page <i>images</i> with a late-interaction retriever, so structure survives.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="measured">
+    <div class="kicker">Measured, not marketed</div>
+    <h2>Every number below is real.</h2>
+    <p class="sub">A 38-question hand-verified benchmark grades every change. Improvements that don't move
+    the numbers get benched — two popular techniques already were.</p>
+
+    <div class="measure">
+      <table>
+        <tr><th>Retrieval config</th><th>Recall@5</th><th>Verdict</th></tr>
+        <tr><td>Keyword search (BM25)</td><td class="num">0.061</td><td class="down">benched — measured, failed</td></tr>
+        <tr><td>Dense embeddings</td><td class="num">0.313</td><td>baseline</td></tr>
+        <tr><td>Dense + metadata filter</td><td class="num up">0.505</td><td class="up">champion — +61%, zero cost</td></tr>
+        <tr><td>Visual + hybrid + rerank</td><td class="num">measuring…</td><td>index building now</td></tr>
+      </table>
+    </div>
+    <p class="note">
+      Generation quality on the same benchmark: answer correctness 0.65 · abstention recall 0.80 ·
+      every false “I don't know” traced to a retrieval miss, not a hallucination.
+      Full lab notebook with reproduce commands in
+      <a href="https://github.com/Shreyaskale7/sightline/blob/main/docs/RESULTS.md" target="_blank" rel="noopener" style="color:var(--accent)">docs/RESULTS.md</a>.
+    </p>
+  </section>
+</main>
+
+<footer>
+  <div>Sightline<span style="color:var(--accent)">.</span> — visual-first document intelligence over SEC filings.</div>
+  <div>Built in the open · <a href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">github.com/Shreyaskale7/sightline</a></div>
+</footer>
+</body>
+</html>

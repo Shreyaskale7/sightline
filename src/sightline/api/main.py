@@ -16,7 +16,8 @@ from ..observability import span
 
 app = FastAPI(title="Sightline", version="0.1.0")
 
-_INDEX_HTML = Path(__file__).parent / "index.html"
+_LANDING_HTML = Path(__file__).parent / "landing.html"
+_APP_HTML = Path(__file__).parent / "app.html"
 
 
 class QueryRequest(BaseModel):
@@ -43,8 +44,14 @@ def health() -> dict[str, str]:
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
-    """The demo page: ask a question, see the cited page images inline."""
-    return _INDEX_HTML.read_text(encoding="utf-8")
+    """Landing page: what Sightline is, with the real measured numbers."""
+    return _LANDING_HTML.read_text(encoding="utf-8")
+
+
+@app.get("/app", response_class=HTMLResponse)
+def console() -> str:
+    """The analyst console: ask a question, see the cited page images inline."""
+    return _APP_HTML.read_text(encoding="utf-8")
 
 
 @app.get("/pages/{accession}/{page_no}")

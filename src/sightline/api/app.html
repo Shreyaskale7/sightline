@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sightline Console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>👁️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070f; --bg-soft: #0b0f1d; --panel: rgba(255,255,255,.03);
+    --border: rgba(255,255,255,.08); --text: #e8ecf4; --muted: #8a93a8;
+    --accent: #6d8dff; --accent-2: #38e1c6; --green: #2ea86b; --amber: #d9a13c;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); height: 100vh; overflow: hidden;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: grid; grid-template-rows: auto 1fr;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  header {
+    display: flex; align-items: center; gap: 1rem; padding: .85rem 1.4rem;
+    border-bottom: 1px solid var(--border); background: rgba(5,7,15,.8); backdrop-filter: blur(10px);
+  }
+  .logo { font-weight: 800; font-size: 1.1rem; }
+  .logo .dot { color: var(--accent); }
+  .badge {
+    font-size: .72rem; color: var(--accent-2); border: 1px solid rgba(56,225,198,.3);
+    background: rgba(56,225,198,.07); padding: .25rem .7rem; border-radius: 999px;
+  }
+  header .right { margin-left: auto; display: flex; gap: 1.2rem; font-size: .85rem; color: var(--muted); }
+  header .right a:hover { color: var(--text); }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  @media (max-width: 840px) { .layout { grid-template-columns: 1fr; } aside { display: none; } }
+
+  aside {
+    border-right: 1px solid var(--border); padding: 1.4rem; overflow-y: auto;
+    background: var(--bg-soft);
+  }
+  .side-h { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 .8rem; font-weight: 700; }
+  .corpus { display: flex; flex-direction: column; gap: .45rem; margin-bottom: 1.8rem; }
+  .co {
+    display: flex; justify-content: space-between; font-size: .85rem;
+    padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+  }
+  .co span { color: var(--muted); font-size: .75rem; }
+  .ex {
+    display: block; width: 100%; text-align: left; font: inherit; font-size: .83rem; line-height: 1.45;
+    color: var(--muted); background: none; border: 1px solid transparent; border-radius: 8px;
+    padding: .55rem .7rem; cursor: pointer; margin-bottom: .3rem; transition: all .15s;
+  }
+  .ex:hover { color: var(--text); background: var(--panel); border-color: var(--border); }
+  .ex.tricky { color: var(--amber); }
+
+  .main { display: flex; flex-direction: column; min-height: 0; }
+  .askbar { padding: 1.4rem 1.6rem 1rem; }
+  .askwrap {
+    display: flex; gap: .6rem; background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: 14px; padding: .5rem; transition: border-color .2s, box-shadow .2s;
+  }
+  .askwrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(109,141,255,.15); }
+  #q {
+    flex: 1; background: none; border: none; outline: none; color: inherit;
+    font: inherit; font-size: 1rem; padding: .55rem .8rem;
+  }
+  #go {
+    padding: .65rem 1.4rem; border-radius: 10px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #8a6dff); color: #fff;
+    font-weight: 700; font-size: .95rem; transition: opacity .15s, transform .15s;
+  }
+  #go:hover:not(:disabled) { transform: translateY(-1px); }
+  #go:disabled { opacity: .45; cursor: wait; }
+
+  .results { flex: 1; overflow-y: auto; padding: 0 1.6rem 2rem; }
+  .hint { color: var(--muted); font-size: .9rem; text-align: center; margin-top: 4rem; line-height: 1.8; }
+  .hint b { color: var(--text); }
+
+  .answer {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--bg-soft);
+    padding: 1.4rem 1.6rem; margin-bottom: 1.4rem; animation: rise .35s ease;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  .answer.ok { border-left: 3px solid var(--green); }
+  .answer.abstain { border-left: 3px solid var(--amber); }
+  .alabel { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; margin-bottom: .6rem; }
+  .answer.ok .alabel { color: var(--green); }
+  .answer.abstain .alabel { color: var(--amber); }
+  .answer p.txt { line-height: 1.7; font-size: 1.02rem; }
+  .meta { margin-top: .9rem; font-size: .78rem; color: var(--muted); }
+
+  .cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; }
+  .cite {
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden; cursor: zoom-in;
+    background: var(--bg-soft); transition: transform .18s, border-color .18s; animation: rise .4s ease;
+  }
+  .cite:hover { transform: translateY(-3px); border-color: rgba(109,141,255,.4); }
+  .cite img { display: block; width: 100%; height: 240px; object-fit: cover; object-position: top; background: #fff; }
+  .cite figcaption { padding: .55rem .8rem; font-size: .72rem; color: var(--muted); }
+  .cite figcaption b { color: var(--text); display: block; font-size: .78rem; }
+
+  .skel { border-radius: 14px; height: 110px; margin-bottom: 1.4rem;
+    background: linear-gradient(100deg, var(--panel) 40%, rgba(255,255,255,.07) 50%, var(--panel) 60%);
+    background-size: 200% 100%; animation: sh 1.2s infinite linear; border: 1px solid var(--border); }
+  @keyframes sh { to { background-position: -200% 0; } }
+  .thinking { color: var(--muted); font-size: .85rem; margin: -0.8rem 0 1rem .2rem; }
+
+  dialog {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--bg-soft);
+    padding: 0; max-width: min(920px, 92vw); max-height: 92vh; overflow: auto;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(4px); }
+  dialog img { display: block; width: 100%; background: #fff; }
+  dialog .cap { padding: .8rem 1.2rem; font-size: .85rem; color: var(--muted); display: flex; justify-content: space-between; }
+  dialog .cap button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: .3rem .9rem; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/">Sightline<span class="dot">.</span></a>
+  <span class="badge">● 1,329 pages live</span>
+  <div class="right">
+    <a href="/">Home</a>
+    <a href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <p class="side-h">Corpus</p>
+    <div class="corpus">
+      <div class="co"><b>NVDA</b><span>10-K + 3×10-Q</span></div>
+      <div class="co"><b>AMD</b><span>10-K + 3×10-Q</span></div>
+      <div class="co"><b>INTC</b><span>10-K + 3×10-Q</span></div>
+      <div class="co"><b>MU</b><span>10-K + 3×10-Q</span></div>
+      <div class="co"><b>QCOM</b><span>10-K + 3×10-Q</span></div>
+    </div>
+    <p class="side-h">Try these</p>
+    <button class="ex" data-q="What was NVIDIA's total revenue in its most recent 10-K?">NVIDIA's total revenue, latest 10-K</button>
+    <button class="ex" data-q="How much did AMD spend on research and development in its most recent 10-K?">AMD's R&amp;D spend</button>
+    <button class="ex" data-q="Which spent more on R&D in its most recent 10-K, NVIDIA or Intel?">NVIDIA vs Intel on R&amp;D</button>
+    <button class="ex" data-q="How did NVIDIA's quarterly revenue change across its last three 10-Q filings?">NVIDIA's revenue trend across 10-Qs</button>
+    <button class="ex" data-q="What new process technology did Intel ramp into high-volume production in 2025?">Intel's new process node</button>
+    <button class="ex tricky" data-q="What was Broadcom's total revenue in its most recent 10-K?">⚠ A question it should refuse</button>
+  </aside>
+
+  <div class="main">
+    <div class="askbar">
+      <form id="f" class="askwrap">
+        <input id="q" type="text" autocomplete="off"
+               placeholder="Ask an analyst question — every claim will cite the actual page…" required>
+        <button id="go" type="submit">Ask</button>
+      </form>
+    </div>
+
+    <div class="results" id="out">
+      <p class="hint">
+        <b>Answers arrive with evidence.</b><br>
+        Every claim cites the actual filing page, rendered inline.<br>
+        If the corpus can't support an answer, Sightline says so — by design.
+      </p>
+    </div>
+  </div>
+</div>
+
+<dialog id="zoom">
+  <img id="zoomimg" alt="cited page, full size">
+  <div class="cap"><span id="zoomcap"></span><button onclick="zoom.close()">Close ✕</button></div>
+</dialog>
+
+<script>
+const f = document.getElementById("f"), q = document.getElementById("q"),
+      go = document.getElementById("go"), out = document.getElementById("out"),
+      zoom = document.getElementById("zoom"), zoomimg = document.getElementById("zoomimg"),
+      zoomcap = document.getElementById("zoomcap");
+
+document.querySelectorAll(".ex").forEach(b =>
+  b.addEventListener("click", () => { q.value = b.dataset.q; f.requestSubmit(); }));
+
+f.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  go.disabled = true;
+  const t0 = performance.now();
+  out.innerHTML = `<div class="skel"></div><p class="thinking">Routing → searching 1,329 pages → reading the winners → verifying citations…</p>`;
+  try {
+    const r = await fetch("/query", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q.value, k: 5 }),
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status + " — is the index built and an LLM key configured?");
+    const d = await r.json();
+    const ms = ((performance.now() - t0) / 1000).toFixed(1);
+    let html = `<div class="answer ${d.abstained ? "abstain" : "ok"}">
+        <div class="alabel">${d.abstained ? "Abstained — the corpus can't support this" : "Answer · every claim verified"}</div>
+        <p class="txt">${esc(d.answer)}</p>
+        <div class="meta">${d.citations.length} citation${d.citations.length === 1 ? "" : "s"} · ${ms}s · retrieve → answer → verify</div>
+      </div>`;
+    if (d.citations.length) {
+      html += `<div class="cgrid">` + d.citations.map(c => `
+        <figure class="cite" data-src="${c.image_url}" data-cap="${c.accession} · page ${c.page_no}">
+          <img loading="lazy" src="${c.image_url}" alt="cited page ${c.page_no}">
+          <figcaption><b>Page ${c.page_no}</b>${c.accession}</figcaption>
+        </figure>`).join("") + `</div>`;
+    }
+    out.innerHTML = html;
+    out.querySelectorAll(".cite").forEach(el => el.addEventListener("click", () => {
+      zoomimg.src = el.dataset.src; zoomcap.textContent = el.dataset.cap; zoom.showModal();
+    }));
+  } catch (err) {
+    out.innerHTML = `<div class="answer abstain"><div class="alabel">Error</div><p class="txt">${esc(String(err))}</p></div>`;
+  } finally {
+    go.disabled = false;
+  }
+});
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m]));
+}
+</script>
+</body>
+</html>

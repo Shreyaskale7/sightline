@@ -14,10 +14,16 @@ from sightline.ingest.store import MetadataStore
 client = TestClient(app)
 
 
-def test_home_serves_demo_page():
+def test_home_serves_landing_page():
     r = client.get("/")
     assert r.status_code == 200
-    assert "Sightline" in r.text and "/query" in r.text
+    assert "Sightline" in r.text and "/app" in r.text  # landing links to the console
+
+
+def test_console_serves_ask_interface():
+    r = client.get("/app")
+    assert r.status_code == 200
+    assert "Sightline" in r.text and "/query" in r.text  # console calls the API
 
 
 def test_health():
