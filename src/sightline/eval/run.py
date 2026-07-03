@@ -25,10 +25,12 @@ def _make_retrieve_fn(name: str):
     """Build the retrieval function for one ablation config. Returns (fn, cleanup).
 
     dense            — BGE text embeddings in Qdrant (the M1 baseline)
+    dense_filtered   — dense + deterministic ticker/form metadata filter
     bm25             — keyword/exact-match ranking (rank_bm25), built in memory from the store
     hybrid           — dense + bm25 fused with Reciprocal Rank Fusion
     visual           — ColModernVBERT page-image multivectors, MaxSim (M2)
-    hybrid_tv        — dense text + visual fused with RRF (M2)
+    visual_filtered  — visual + the same metadata filter
+    hybrid_tv        — filtered dense + filtered visual fused with RRF (M2)
     hybrid_tv_rerank — hybrid_tv top-20 re-ordered by a BGE cross-encoder (full M2 pipeline)
     """
     from sightline.config import settings
@@ -54,15 +56,24 @@ def _make_retrieve_fn(name: str):
 
         return fn_filtered, rf.close
 
-    if name == "visual":
+    if name in ("visual", "visual_filtered"):
+        from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
         from sightline.retrieval.visual import VisualRetriever
 
         v = VisualRetriever()
         if v.count() == 0:
             raise SystemExit("Visual index is empty — run scripts/index_visual.py first.")
-        return v.retrieve, v.close
+        if name == "visual":
+            return v.retrieve, v.close
+
+        def fn_vf(query: str, k: int = 5):
+            return v.retrieve(query, k=k, query_filter=to_qdrant_filter(parse_query_filters(query)))
+
+        return fn_vf, v.close
 
     if name in ("hybrid_tv", "hybrid_tv_rerank"):
+        # Both legs get the metadata filter — it's the champion config's standard equipment.
+        from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
         from sightline.retrieval.fusion import rrf
         from sightline.retrieval.visual import VisualRetriever
 
@@ -71,9 +82,17 @@ def _make_retrieve_fn(name: str):
         if dense.count() == 0 or v.count() == 0:
             raise SystemExit("Need both text and visual indexes (scripts/index.py + index_visual.py).")
 
+        def _fused(query: str, top_n: int):
+            qf = to_qdrant_filter(parse_query_filters(query))
+            return rrf(
+                dense.retrieve(query, k=20, query_filter=qf),
+                v.retrieve(query, k=20, query_filter=qf),
+                top_n=top_n,
+            )
+
         if name == "hybrid_tv":
             def fn_tv(query: str, k: int = 5):
-                return rrf(dense.retrieve(query, k=20), v.retrieve(query, k=20), top_n=k)
+                return _fused(query, top_n=k)
 
             def cleanup_tv():
                 dense.close()
@@ -87,7 +106,7 @@ def _make_retrieve_fn(name: str):
         reranker = Reranker()
 
         def fn_rerank(query: str, k: int = 5):
-            fused = rrf(dense.retrieve(query, k=20), v.retrieve(query, k=20), top_n=20)
+            fused = _fused(query, top_n=20)
             pairs = []
             for h in fused:
                 page = store.get_page(h.accession, h.page_no)
@@ -298,7 +317,7 @@ if __name__ == "__main__":
     name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
     if "--ablation" in args:
         for n in ("bm25", "dense", "dense_filtered", "hybrid", "visual",
-                  "hybrid_tv", "hybrid_tv_rerank"):
+                  "visual_filtered", "hybrid_tv", "hybrid_tv_rerank"):
             try:
                 run(retriever_name=n)
             except SystemExit as e:  # e.g. visual index not built yet — skip, keep the rest

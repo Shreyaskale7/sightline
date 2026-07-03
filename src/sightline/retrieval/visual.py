@@ -156,12 +156,16 @@ class VisualRetriever:
                 print(f"[visual-index] {done}/{len(pages)} pages", flush=True)
         return done
 
-    def retrieve(self, query: str, k: int = 5) -> list[Hit]:
+    def retrieve(self, query: str, k: int = 5, query_filter: object | None = None) -> list[Hit]:
+        """Top-k pages by MaxSim; `query_filter` = optional Qdrant payload filter
+        (retrieval/filters.py) so the visual leg gets the same metadata advantage as dense."""
         self._ensure_client()
         if not self._client.collection_exists(self.collection):
             return []
         qvec = self._embed_query(query)
-        res = self._client.query_points(self.collection, query=qvec, limit=k).points
+        res = self._client.query_points(
+            self.collection, query=qvec, limit=k, query_filter=query_filter
+        ).points
         return [
             Hit(
                 accession=p.payload["accession"],
