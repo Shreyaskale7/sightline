@@ -26,6 +26,10 @@ from ..config import settings
 from .text_baseline import Hit
 
 _MODEL_NAME = "ModernVBERT/colmodernvbert"
+# The processor (tokenizer + image preprocessing) loads from the BASE repo: the adapter repo
+# ships no config.json, which breaks offline processor resolution. Weights still come from
+# the adapter on top of the base — only the processor artifacts differ in location.
+_PROCESSOR_NAME = "ModernVBERT/colmodernvbert-base"
 _ID_NS = uuid.UUID("00000000-0000-0000-0000-0000515111e1")  # distinct from the text namespace
 
 
@@ -68,7 +72,7 @@ class VisualRetriever:
             self._model = ColModernVBert.from_pretrained(
                 self.model_name, torch_dtype=torch.float32
             ).eval()
-            self._processor = ColModernVBertProcessor.from_pretrained(self.model_name)
+            self._processor = ColModernVBertProcessor.from_pretrained(_PROCESSOR_NAME)
 
     def _embed_images(self, image_paths: list[Path]) -> list[list[list[float]]]:
         """PNG paths -> one multivector (list of patch vectors) per page."""
