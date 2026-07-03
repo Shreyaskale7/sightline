@@ -82,3 +82,65 @@ def test_build_prompt_truncates_huge_pages():
     page = _Page("x-1", 1, "A" * 100_000)
     prompt = build_prompt("q", [page])
     assert len(prompt) < 20_000  # the 6k/page cap held
+
+
+# --- visual answer path (M2) --------------------------------------------------
+
+@dataclass
+class _ImagePage:
+    accession: str
+    page_no: int
+    image_path: object
+    ticker: str = "NVDA"
+    form: str = "10-K"
+
+
+def _png(tmp_path, name="page.png", size=(1400, 1800)):
+    from PIL import Image
+
+    p = tmp_path / name
+    Image.new("RGB", size, "white").save(p)
+    return p
+
+
+def test_build_visual_content_labels_then_images(tmp_path):
+    from sightline.answerer import build_visual_content
+
+    page = _ImagePage("0001045810-26-000021", 51, _png(tmp_path))
+    content = build_visual_content("What was revenue?", [page])
+    kinds = [c["type"] for c in content]
+    assert kinds == ["text", "text", "image_url", "text"]  # instructions, label, image, question
+    assert "[p:0001045810-26-000021#51]" in content[1]["text"]
+    assert content[2]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert content[-1]["text"].endswith("What was revenue?")
+
+
+def test_visual_images_are_downscaled(tmp_path):
+    import base64
+    import io
+
+    from PIL import Image
+
+    from sightline.answerer import build_visual_content
+
+    page = _ImagePage("a", 1, _png(tmp_path, size=(2048, 2600)))
+    content = build_visual_content("q", [page])
+    b64 = content[2]["image_url"]["url"].split(",", 1)[1]
+    img = Image.open(io.BytesIO(base64.b64decode(b64)))
+    assert img.width == 1024  # capped
+
+
+def test_answer_from_images_end_to_end_and_cap(tmp_path):
+    acc = "0001045810-26-000021"  # citation tags only match real accession formats
+    pages = [_ImagePage(acc, i, _png(tmp_path, f"p{i}.png")) for i in range(1, 6)]
+    fake = _FakeClient(f"Revenue was $215,938 million [p:{acc}#1].")
+    r = Answerer(model="fake-vlm", client=fake).answer_from_images("q", pages, max_images=3)
+    assert not r.abstained and r.citations[0].page_no == 1
+    sent = fake.messages.last_kwargs["messages"][0]["content"]
+    assert sum(1 for c in sent if c["type"] == "image_url") == 3  # cap held
+
+
+def test_answer_from_images_no_pages_abstains():
+    a = Answerer(client=_FakeClient("never called"))
+    r = a.answer_from_images("q", [])
+    assert r.abstained and a._client.messages.last_kwargs is None
