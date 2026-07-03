@@ -19,19 +19,22 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     # Generation: hosted Claude API for the M1 answer path + eval judge.
     "anthropic>=0.30",
+    # Image handling in the visual answer path (downscale page PNGs before sending).
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]
-# Retrieval + models. Heavier; install when you reach M1/M2.
+# Retrieval (light, CI-friendly): embedded Qdrant + ONNX embeddings + BM25. No torch.
 retrieval = [
     "qdrant-client>=1.10",
-    "sentence-transformers>=3.0",
+    "fastembed>=0.3",
     "rank-bm25>=0.2.2",
 ]
-# Visual retrieval (M2). Pulls torch — install on your GPU box / Kaggle.
+# Visual retrieval + reranking (M2). Pulls torch — heavy; not installed in CI.
 visual = [
     "colpali-engine>=0.3",
     "torch>=2.3",
+    "sentence-transformers>=3.0",  # cross-encoder reranker
 ]
 # Orchestration + eval + observability (M3/M4).
 llmops = [
