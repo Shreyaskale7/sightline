@@ -43,18 +43,41 @@ def _make_retrieve_fn(name: str):
             raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
         return r.retrieve, r.close
 
-    if name == "dense_filtered":
+    if name in ("dense_filtered", "dense_chunked", "dense_chunked_filtered"):
         from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
 
-        rf = TextRetriever()
+        rf = TextRetriever(chunked="chunked" in name)
         if rf.count() == 0:
-            raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
+            raise SystemExit(
+                f"Collection '{rf.collection}' is empty — build it first "
+                f"(scripts/index.py{' --chunked' if rf.chunked else ''})."
+            )
+        if name == "dense_chunked":
+            return rf.retrieve, rf.close
 
         def fn_filtered(query: str, k: int = 5):
             # Deterministic ticker/form filter parsed from the question itself.
             return rf.retrieve(query, k=k, query_filter=to_qdrant_filter(parse_query_filters(query)))
 
         return fn_filtered, rf.close
+
+    if name == "planned":
+        # Deterministic decomposition: per-company / per-filing fan-out + interleave.
+        from sightline.retrieval.decompose import decomposed_retrieve
+
+        rp = TextRetriever()
+        if rp.count() == 0:
+            raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
+        store_p = MetadataStore(settings.data_dir / "sightline.db")
+
+        def fn_planned(query: str, k: int = 5):
+            return decomposed_retrieve(query, k, rp.retrieve, store_p.list_accessions)
+
+        def cleanup_planned():
+            rp.close()
+            store_p.close()
+
+        return fn_planned, cleanup_planned
 
     if name in ("visual", "visual_filtered"):
         from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
@@ -316,8 +339,8 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
     if "--ablation" in args:
-        for n in ("bm25", "dense", "dense_filtered", "hybrid", "visual",
-                  "visual_filtered", "hybrid_tv", "hybrid_tv_rerank"):
+        for n in ("bm25", "dense", "dense_filtered", "dense_chunked_filtered", "planned",
+                  "hybrid", "visual", "visual_filtered", "hybrid_tv", "hybrid_tv_rerank"):
             try:
                 run(retriever_name=n)
             except SystemExit as e:  # e.g. visual index not built yet — skip, keep the rest

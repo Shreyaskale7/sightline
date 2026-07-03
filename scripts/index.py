@@ -20,9 +20,15 @@ console = Console()
 
 
 @app.command()
-def main(reset: bool = typer.Option(False, "--reset", help="Drop the collection before indexing.")) -> None:
+def main(
+    reset: bool = typer.Option(False, "--reset", help="Drop the collection before indexing."),
+    chunked: bool = typer.Option(
+        False, "--chunked",
+        help="Embed overlapping page windows (fixes 512-token truncation) into a separate collection.",
+    ),
+) -> None:
     store = MetadataStore(settings.data_dir / "sightline.db")
-    retriever = TextRetriever()
+    retriever = TextRetriever(chunked=chunked)
     try:
         if reset:
             retriever._ensure()  # noqa: SLF001 - CLI convenience

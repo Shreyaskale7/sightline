@@ -52,11 +52,16 @@ def _point_id(accession: str, page_no: int) -> str:
 class TextRetriever:
     def __init__(
         self,
-        collection: str = "sightline_text",
+        collection: str | None = None,
         qdrant_location: str | None = None,
         model_name: str = _MODEL_NAME,
+        chunked: bool = False,
     ) -> None:
-        self.collection = collection
+        # chunked=True embeds each page as overlapping windows (see chunking.py) — fixes the
+        # 512-token truncation blind spot. Separate collection so both variants coexist and
+        # the ablation can measure the lift honestly.
+        self.chunked = chunked
+        self.collection = collection or ("sightline_text_chunks" if chunked else "sightline_text")
         self.model_name = model_name
         # Default to a local on-disk Qdrant next to the rest of the data.
         self._location = qdrant_location or str(Path(settings.data_dir) / "qdrant")
@@ -113,13 +118,26 @@ class TextRetriever:
         if not pages:
             return 0
 
-        vectors = self._embed_passages([p.text for p in pages])
+        # One embedding unit per page (baseline) or per window (chunked). Every unit's
+        # payload points at its page — the page stays the unit of retrieval/citation.
+        units: list[tuple[object, int, str]] = []  # (page, window_idx, text)
+        if self.chunked:
+            from .chunking import chunk_text
+
+            for p in pages:
+                for i, c in enumerate(chunk_text(p.text)):
+                    units.append((p, i, c))
+        else:
+            units = [(p, 0, p.text) for p in pages]
+
+        vectors = self._embed_passages([t for _, _, t in units])
         self._dim = len(vectors[0])
         self._ensure_collection(self._dim)
 
         points = [
             PointStruct(
-                id=_point_id(p.accession, p.page_no),
+                id=str(uuid.uuid5(_ID_NS, f"{p.accession}#{p.page_no}#c{i}")) if self.chunked
+                else _point_id(p.accession, p.page_no),
                 vector=vec,
                 payload={
                     "accession": p.accession,
@@ -128,7 +146,7 @@ class TextRetriever:
                     "form": getattr(p, "form", ""),
                 },
             )
-            for p, vec in zip(pages, vectors)
+            for (p, i, _), vec in zip(units, vectors)
         ]
         self._client.upsert(self.collection, points=points)
         return len(points)
@@ -143,19 +161,31 @@ class TextRetriever:
         if not self._client.collection_exists(self.collection):
             return []
         qvec = self._embed_query(query)
+        # Chunked mode: over-fetch windows, then collapse to page level (best window wins) —
+        # several windows of one page in the top-k would crowd out other pages otherwise.
+        limit = k * 4 if self.chunked else k
         res = self._client.query_points(
-            self.collection, query=qvec, limit=k, query_filter=query_filter
+            self.collection, query=qvec, limit=limit, query_filter=query_filter
         ).points
-        return [
-            Hit(
-                accession=p.payload["accession"],
-                page_no=int(p.payload["page_no"]),
-                score=float(p.score),
-                ticker=p.payload.get("ticker", ""),
-                form=p.payload.get("form", ""),
+        hits: list[Hit] = []
+        seen: set[tuple[str, int]] = set()
+        for p in res:
+            key = (p.payload["accession"], int(p.payload["page_no"]))
+            if key in seen:
+                continue  # results arrive best-first, so the first window is the page's best
+            seen.add(key)
+            hits.append(
+                Hit(
+                    accession=key[0],
+                    page_no=key[1],
+                    score=float(p.score),
+                    ticker=p.payload.get("ticker", ""),
+                    form=p.payload.get("form", ""),
+                )
             )
-            for p in res
-        ]
+            if len(hits) >= k:
+                break
+        return hits
 
     def count(self) -> int:
         self._ensure()

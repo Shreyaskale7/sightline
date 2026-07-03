@@ -131,6 +131,18 @@ class MetadataStore:
     def count_pages(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
 
+    def list_accessions(self, ticker: str, form: str | None = None, limit: int = 3) -> list[str]:
+        """Most-recent-first accession numbers for a ticker (optionally one form type).
+        Used by decomposed retrieval: 'across the last three 10-Qs' -> one search per filing."""
+        q = "SELECT accession FROM filings WHERE ticker = ?"
+        args: list[object] = [ticker]
+        if form:
+            q += " AND form = ?"
+            args.append(form)
+        q += " ORDER BY filing_date DESC LIMIT ?"
+        args.append(limit)
+        return [r["accession"] for r in self._conn.execute(q, args)]
+
     def get_page(self, accession: str, page_no: int) -> StoredPage | None:
         """Fetch one page by its identity — used to hand retrieved pages to the answerer."""
         r = self._conn.execute(
