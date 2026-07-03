@@ -24,9 +24,12 @@ GOLDEN = Path(__file__).parent / "golden_set.yaml"
 def _make_retrieve_fn(name: str):
     """Build the retrieval function for one ablation config. Returns (fn, cleanup).
 
-    dense  — BGE embeddings in Qdrant (the M1 baseline)
-    bm25   — keyword/exact-match ranking (rank_bm25), built in memory from the store
-    hybrid — both legs fused with Reciprocal Rank Fusion (each contributes its top-20)
+    dense            — BGE text embeddings in Qdrant (the M1 baseline)
+    bm25             — keyword/exact-match ranking (rank_bm25), built in memory from the store
+    hybrid           — dense + bm25 fused with Reciprocal Rank Fusion
+    visual           — ColModernVBERT page-image multivectors, MaxSim (M2)
+    hybrid_tv        — dense text + visual fused with RRF (M2)
+    hybrid_tv_rerank — hybrid_tv top-20 re-ordered by a BGE cross-encoder (full M2 pipeline)
     """
     from sightline.config import settings
     from sightline.ingest.store import MetadataStore
@@ -37,6 +40,53 @@ def _make_retrieve_fn(name: str):
         if r.count() == 0:
             raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
         return r.retrieve, r.close
+
+    if name == "visual":
+        from sightline.retrieval.visual import VisualRetriever
+
+        v = VisualRetriever()
+        if v.count() == 0:
+            raise SystemExit("Visual index is empty — run scripts/index_visual.py first.")
+        return v.retrieve, v.close
+
+    if name in ("hybrid_tv", "hybrid_tv_rerank"):
+        from sightline.retrieval.fusion import rrf
+        from sightline.retrieval.visual import VisualRetriever
+
+        dense = TextRetriever()
+        v = VisualRetriever()
+        if dense.count() == 0 or v.count() == 0:
+            raise SystemExit("Need both text and visual indexes (scripts/index.py + index_visual.py).")
+
+        if name == "hybrid_tv":
+            def fn_tv(query: str, k: int = 5):
+                return rrf(dense.retrieve(query, k=20), v.retrieve(query, k=20), top_n=k)
+
+            def cleanup_tv():
+                dense.close()
+                v.close()
+
+            return fn_tv, cleanup_tv
+
+        from sightline.retrieval.rerank import Reranker
+
+        store = MetadataStore(settings.data_dir / "sightline.db")
+        reranker = Reranker()
+
+        def fn_rerank(query: str, k: int = 5):
+            fused = rrf(dense.retrieve(query, k=20), v.retrieve(query, k=20), top_n=20)
+            pairs = []
+            for h in fused:
+                page = store.get_page(h.accession, h.page_no)
+                pairs.append((h, page.text if page else ""))
+            return reranker.rerank(query, pairs, k=k)
+
+        def cleanup_rerank():
+            dense.close()
+            v.close()
+            store.close()
+
+        return fn_rerank, cleanup_rerank
 
     from sightline.retrieval.bm25 import BM25Retriever
 
@@ -58,7 +108,8 @@ def _make_retrieve_fn(name: str):
 
         return fn, dense.close
 
-    raise SystemExit(f"Unknown retriever '{name}' (expected dense | bm25 | hybrid)")
+    raise SystemExit(f"Unknown retriever '{name}' "
+                     f"(expected dense | bm25 | hybrid | visual | hybrid_tv)")
 
 
 def run(golden_path: Path = GOLDEN, retriever_name: str = "dense") -> None:
@@ -233,8 +284,11 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
     if "--ablation" in args:
-        for n in ("bm25", "dense", "hybrid"):  # one table per config = the ablation
-            run(retriever_name=n)
+        for n in ("bm25", "dense", "hybrid", "visual", "hybrid_tv", "hybrid_tv_rerank"):
+            try:
+                run(retriever_name=n)
+            except SystemExit as e:  # e.g. visual index not built yet — skip, keep the rest
+                console.print(f"[yellow]skipping {n}: {e}[/yellow]")
     else:
         run(retriever_name=name)
     if "--generation" in args:
