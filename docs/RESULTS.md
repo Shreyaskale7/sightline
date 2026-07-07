@@ -3,6 +3,44 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — see the prime directive in `CLAUDE.md`.
 
+## M2 — retrieval ablation, text side (2026-07-07)
+
+**Corpus:** 20 filings / 1,329 pages. **Exam:** 44-case golden set (39 answerable). All configs
+scored on the same set. The visual/hybrid rows are pending the visual index build (in progress).
+
+| Config | Recall@5 | nDCG@10 | MRR | What it adds |
+|---|---:|---:|---:|---|
+| BM25 (keyword) | 0.051 | 0.046 | 0.022 | benched — measured, failed |
+| Dense (BGE) | 0.316 | 0.259 | 0.183 | baseline |
+| Dense + metadata filter | 0.479 | 0.408 | 0.339 | ticker/form filter (+52%) |
+| Dense + filter + **chunking** | 0.504 | 0.416 | 0.345 | overlapping page windows (no 512-tok truncation) |
+| Planned (filter + decomposition) | 0.483 | 0.410 | 0.357 | per-company / per-filing fan-out |
+| **Champion** (chunking + filter + decomposition) | **0.509** | **0.419** | **0.361** | both stacked |
+
+**Per-slice, champion vs its ingredients (Recall@5):**
+
+| Slice | n | dense | +filter+chunk | +decomposition (champion) |
+|---|--:|--:|--:|--:|
+| basic | 32 | ~0.35 | **0.562** | 0.562 |
+| cross_company | 4 | 0.25 | 0.250 | **0.375** |
+| multi_hop | 3 | 0.11 | 0.222 | 0.111 (MRR ↑ 0.11→0.33) |
+
+### What the numbers say
+- **Chunking earns its place** (+0.025 overall, concentrated in `basic`): pages average 2.7
+  windows each, confirming the 512-token truncation was real — facts in a page's lower half
+  were previously invisible.
+- **Decomposition does exactly its job**: `cross_company` 0.250 → 0.375. Per-company fan-out
+  guarantees both companies' pages reach the top-k, which one blended query couldn't.
+- **The improvements stack** (champion 0.509 > either alone) with one honest wart: `multi_hop`
+  Recall@5 halved while its MRR tripled. Cause (verified by inspection, not guessed):
+  decomposition correctly returns one page per quarterly filing, but *within* each filing dense
+  still prefers the MD&A narrative ("revenue increased X%") over the terse statement table —
+  the original finding resurfacing. This is precisely what the visual leg (whole-page image)
+  and cross-encoder rerank are meant to fix. `multi_hop` is n=3, so treat the slice as
+  directional, not conclusive.
+
+**Bar for the visual/hybrid rows: beat champion Recall@5 = 0.509.**
+
 ## M1 — text-only retrieval baseline (2026-07-02)
 
 **Corpus:** latest 10-K for 5 semiconductor companies (NVDA, AMD, INTC, MU, QCOM).

@@ -61,13 +61,17 @@ def _make_retrieve_fn(name: str):
 
         return fn_filtered, rf.close
 
-    if name == "planned":
+    if name in ("planned", "champion"):
         # Deterministic decomposition: per-company / per-filing fan-out + interleave.
+        # champion = decomposition on top of CHUNKED embeddings (both improvements stacked).
         from sightline.retrieval.decompose import decomposed_retrieve
 
-        rp = TextRetriever()
+        rp = TextRetriever(chunked=(name == "champion"))
         if rp.count() == 0:
-            raise SystemExit("Index is empty — run scripts/ingest.py then scripts/index.py first.")
+            raise SystemExit(
+                f"Collection '{rp.collection}' is empty — build it first "
+                f"(scripts/index.py{' --chunked' if rp.chunked else ''})."
+            )
         store_p = MetadataStore(settings.data_dir / "sightline.db")
 
         def fn_planned(query: str, k: int = 5):
@@ -344,7 +348,8 @@ if __name__ == "__main__":
     name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
     if "--ablation" in args:
         for n in ("bm25", "dense", "dense_filtered", "dense_chunked_filtered", "planned",
-                  "hybrid", "visual", "visual_filtered", "hybrid_tv", "hybrid_tv_rerank"):
+                  "champion", "hybrid", "visual", "visual_filtered", "hybrid_tv",
+                  "hybrid_tv_rerank"):
             try:
                 run(retriever_name=n)
             except SystemExit as e:  # e.g. visual index not built yet — skip, keep the rest
