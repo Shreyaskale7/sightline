@@ -56,6 +56,7 @@ class TextRetriever:
         qdrant_location: str | None = None,
         model_name: str = _MODEL_NAME,
         chunked: bool = False,
+        client: object | None = None,
     ) -> None:
         # chunked=True embeds each page as overlapping windows (see chunking.py) — fixes the
         # 512-token truncation blind spot. Separate collection so both variants coexist and
@@ -65,18 +66,23 @@ class TextRetriever:
         self.model_name = model_name
         # Default to a local on-disk Qdrant next to the rest of the data.
         self._location = qdrant_location or str(Path(settings.data_dir) / "qdrant")
-        self._client = None
+        # An injected client lets several retrievers SHARE one connection — embedded Qdrant
+        # allows only one client per on-disk path, so hybrid configs must share (not open two).
+        self._client = client
+        self._owns_client = client is None
         self._model = None
         self._dim: int | None = None
 
     # --- lazy heavy deps -----------------------------------------------------
     def _ensure(self) -> None:
-        if self._client is not None:
+        if self._model is not None:
             return
         from fastembed import TextEmbedding
         from qdrant_client import QdrantClient
 
         self._model = TextEmbedding(self.model_name)
+        if self._client is not None:
+            return  # injected/shared client
         # A URL means a running server; anything else is treated as a local path (embedded).
         if self._location.startswith(("http://", "https://")):
             self._client = QdrantClient(url=self._location)
@@ -195,10 +201,11 @@ class TextRetriever:
 
     def close(self) -> None:
         """Release the Qdrant client. In embedded mode this frees the on-disk file lock;
-        closing explicitly also avoids a noisy __del__ traceback at interpreter shutdown."""
-        if self._client is not None:
+        closing explicitly also avoids a noisy __del__ traceback at interpreter shutdown.
+        A shared/injected client is left for its owner to close."""
+        if self._client is not None and self._owns_client:
             self._client.close()
-            self._client = None
+        self._client = None
 
     def __enter__(self) -> "TextRetriever":
         return self

@@ -44,12 +44,16 @@ class VisualRetriever:
         qdrant_location: str | None = None,
         model_name: str = _MODEL_NAME,
         batch_size: int = 4,  # CPU-friendly
+        client: object | None = None,
     ) -> None:
         self.collection = collection
         self.model_name = model_name
         self.batch_size = batch_size
         self._location = qdrant_location or str(Path(settings.data_dir) / "qdrant")
-        self._client = None
+        # Shared/injected client: embedded Qdrant is one-client-per-path, so hybrid configs
+        # pass the SAME client the text retriever uses (see run.py).
+        self._client = client
+        self._owns_client = client is None
         self._model = None
         self._processor = None
 
@@ -211,9 +215,9 @@ class VisualRetriever:
         return self._client.count(self.collection).count
 
     def close(self) -> None:
-        if self._client is not None:
+        if self._client is not None and self._owns_client:
             self._client.close()
-            self._client = None
+        self._client = None
 
     def __enter__(self) -> "VisualRetriever":
         return self

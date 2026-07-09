@@ -100,12 +100,17 @@ def _make_retrieve_fn(name: str):
 
     if name in ("hybrid_tv", "hybrid_tv_rerank"):
         # Both legs get the metadata filter — it's the champion config's standard equipment.
+        from qdrant_client import QdrantClient
+
         from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
         from sightline.retrieval.fusion import rrf
         from sightline.retrieval.visual import VisualRetriever
 
-        dense = TextRetriever()
-        v = VisualRetriever()
+        # ONE shared client: embedded Qdrant is single-client-per-path, so the two legs must
+        # not each open their own (that was the hybrid rows' silent failure).
+        shared = QdrantClient(path=str(Path(settings.data_dir) / "qdrant"))
+        dense = TextRetriever(client=shared)
+        v = VisualRetriever(client=shared)
         if dense.count() == 0 or v.count() == 0:
             raise SystemExit("Need both text and visual indexes (scripts/index.py + index_visual.py).")
 
@@ -122,8 +127,7 @@ def _make_retrieve_fn(name: str):
                 return _fused(query, top_n=k)
 
             def cleanup_tv():
-                dense.close()
-                v.close()
+                shared.close()
 
             return fn_tv, cleanup_tv
 
@@ -141,8 +145,7 @@ def _make_retrieve_fn(name: str):
             return reranker.rerank(query, pairs, k=k)
 
         def cleanup_rerank():
-            dense.close()
-            v.close()
+            shared.close()
             store.close()
 
         return fn_rerank, cleanup_rerank
