@@ -1,11 +1,14 @@
-"""FastAPI app: /query pipeline, cited-page-image serving, and a minimal demo page.
+"""FastAPI app: /query pipeline, cited-page-image serving, landing + console pages.
 
-The demo's core promise (and the M5 killer feature in embryo): every answer arrives with the
-ACTUAL page image it was cited from, rendered inline — you never have to trust a citation,
-you can look at it. Region highlighting joins in M5 proper (ColPali patch attention).
+The demo's core promise: every answer arrives with the ACTUAL page image it was cited from,
+rendered inline with the answer's figures highlighted in place (see highlight.py) — you never
+have to trust a citation, you can look at exactly where it came from. And the full pipeline
+trace (router decision → retrieval → rerank → verify, with timings) rides along in the
+response, so the demo shows its work.
 """
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -18,6 +21,36 @@ app = FastAPI(title="Sightline", version="0.1.0")
 
 _LANDING_HTML = Path(__file__).parent / "landing.html"
 _APP_HTML = Path(__file__).parent / "app.html"
+
+# Load the retriever (embedding + reranker models, Qdrant client) ONCE and reuse it — otherwise
+# every request pays ~20s of model-load. Embedded Qdrant is single-client-per-path, so one
+# shared instance is also the only correct option. A lock serializes queries (the embedded DB
+# and the CPU models aren't built for true concurrency) — fine for a single-worker demo.
+_retriever = None
+_retriever_lock = threading.Lock()
+
+
+def _get_retriever():
+    global _retriever
+    if _retriever is None:
+        from ..retrieval.routed import RoutedRetriever
+
+        _retriever = RoutedRetriever()
+    return _retriever
+
+
+def _warmup_target() -> None:
+    try:
+        _get_retriever()
+    except Exception as e:  # missing index/models (e.g. CI) shouldn't crash a background thread
+        print(f"[warmup] skipped: {e}")
+
+
+@app.on_event("startup")
+def _warmup() -> None:
+    """Load the models in the background at boot so the first real query is warm (~5s), not
+    cold (~27s incl. model load). Non-blocking: the server accepts connections immediately."""
+    threading.Thread(target=_warmup_target, daemon=True).start()
 
 
 class QueryRequest(BaseModel):
@@ -90,15 +123,16 @@ def query(req: QueryRequest) -> QueryResponse:
     from ..config import settings
     from ..ingest.store import MetadataStore
     from ..observability import trace
-    from ..retrieval.routed import RoutedRetriever
     from ..verify import verify
 
     t0 = time.perf_counter()
-    with trace("query", question=req.question, k=req.k) as stages:
+    # Serialize: the shared retriever holds an embedded-Qdrant client + CPU models, not built
+    # for concurrent access. A demo is low-QPS; correctness beats throughput here.
+    with _retriever_lock, trace("query", question=req.question, k=req.k) as stages:
         # Champion retrieval config (measured Recall@5 0.603): the router picks the best-per-slice
         # config — decomposition for comparisons, chunk+rerank for everything else.
-        with RoutedRetriever() as retriever:
-            hits = retriever.retrieve(req.question, k=req.k)
+        retriever = _get_retriever()
+        hits = retriever.retrieve(req.question, k=req.k)
         with MetadataStore(settings.data_dir / "sightline.db") as store:
             with span("fetch_pages") as s:
                 pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
