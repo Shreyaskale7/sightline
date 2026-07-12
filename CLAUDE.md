@@ -32,9 +32,12 @@ the corpus can't support an answer.
   (NVDA/AMD/INTC/MU/QCOM 10-Ks + 10-Qs); 38-case golden set; retrieval R@5 0.313 dense /
   **0.505 dense+metadata-filter**; generation correctness 0.65, citation 0.43, abstention
   recall 0.80 — all on a $0 free-model stack. Full history in `docs/RESULTS.md`.
-- [~] **M2 — Visual + hybrid retrieval**: ColModernVBERT retriever, RRF fusion, cross-encoder
-  rerank, and the visual answer path are built and smoke-tested; full visual index + the
-  ablation table are in progress. Bar to beat: R@5 0.505.
+- [x] **M2 — Visual + hybrid retrieval**: ✅ done 2026-07-10. Full 12-row ablation on the
+  44-case exam. Findings: cross-encoder rerank is the biggest lever (dense 0.316 →
+  **grand 0.577**, +83%); the CPU visual model (ColModernVBERT) *underperformed* (0.154) and
+  *hurts* in fusion — measured, not assumed; metadata filter + chunking are cheap real wins;
+  reranking undoes decomposition's cross-company gain → motivates config-routing in M3.
+  Full table in `docs/RESULTS.md`.
 - [ ] **M3 — Agents + grounding**: LangGraph router → planner → answerer → verifier → synthesis;
   table-QA path; NER for citation anchoring; LLM-as-judge calibrated against human labels (Cohen's κ).
 - [ ] **M4 — LLMOps**: cost/latency dashboard + money-shot metric, prompt registry, CI eval gate,

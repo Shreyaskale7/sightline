@@ -41,6 +41,59 @@ scored on the same set. The visual/hybrid rows are pending the visual index buil
 
 **Bar for the visual/hybrid rows: beat champion Recall@5 = 0.509.**
 
+## M2 — the full ablation table (2026-07-10)
+
+The centerpiece. Every row measured on the same 44-case exam (39 answerable), same 1,329-page
+corpus. This is the whole point of the eval harness: not one number, but a defensible ranking
+of every design choice.
+
+| # | Config | Recall@5 | nDCG@10 | MRR |
+|--:|---|---:|---:|---:|
+| 1 | BM25 (keyword) | 0.051 | 0.046 | 0.022 |
+| 2 | Visual only (ColModernVBERT) | 0.154 | 0.080 | 0.043 |
+| 3 | Visual + filter | 0.205 | 0.153 | 0.084 |
+| 4 | Dense (BGE) — M1 baseline | 0.316 | 0.259 | 0.183 |
+| 5 | Hybrid text+visual (RRF) | 0.368 | 0.312 | 0.232 |
+| 6 | Dense + filter | 0.479 | 0.408 | 0.339 |
+| 7 | Planned (filter + decomposition) | 0.483 | 0.410 | 0.357 |
+| 8 | Dense + filter + chunking | 0.504 | 0.416 | 0.345 |
+| 9 | Champion (chunk + filter + decompose) | 0.509 | 0.419 | 0.361 |
+| 10 | Hybrid text+visual + rerank | 0.517 | 0.412 | 0.370 |
+| 11 | Dense + filter + rerank | 0.551 | 0.485 | 0.452 |
+| 12 | **Grand (chunk + filter + decompose + rerank)** | **0.577** | 0.479 | 0.442 |
+
+**Per-slice Recall@5 (where the real story lives):**
+
+| Slice | n | dense (#4) | champion (#9) | dense+rerank (#11) | grand (#12) |
+|---|--:|--:|--:|--:|--:|
+| basic | 32 | 0.35 | 0.562 | 0.625 | **0.656** |
+| cross_company | 4 | 0.25 | **0.375** | 0.125 | 0.125 |
+| multi_hop | 3 | 0.11 | 0.111 | 0.333 | **0.333** |
+
+### The five findings (this is the portfolio)
+1. **The cross-encoder reranker is the single biggest lever**: dense 0.316 → dense+filter+rerank
+   0.551 (**+74%**). Reading (query, page-text) as one input beats any bi-encoder similarity.
+2. **Visual retrieval underperformed — and it was measured, not assumed.** ColModernVBERT (the
+   ~250M CPU-runnable starter) scores 0.154 alone. Diagnosed by inspection: it retrieves the
+   right *company* and right *content type* (income statements) but the wrong *filing/page* —
+   it can't distinguish a 10-K statement from a near-identical 10-Q one, worsened by blank
+   charts in our offline-rendered pages. A larger model (ColQwen2.5) on GPU is the likely path
+   to a visual win — scoped as a cost/quality tradeoff, not claimed.
+3. **Visual actively HURTS in fusion here**: adding it to text+rerank *drops* the score
+   (0.551 → 0.517). Its lower-precision hits dilute the reranker's candidate pool. "Hybrid
+   always wins" is folklore; measured, it loses on this corpus.
+4. **Metadata filtering + chunking are cheap, real wins** (0.316 → 0.504) with zero model cost —
+   encode the metadata you already have before reaching for a bigger model.
+5. **No single config wins every slice — and reranking *undoes* decomposition.** Decomposition
+   lifts cross_company (0.250 → 0.375), but reranking the fused pool re-crowds it back to 0.125
+   (rerank re-sorts by global relevance, breaking the per-company guarantee). The production
+   answer is a **router that picks the retrieval config by question type**: decomposition for
+   comparisons, grand (rerank) for everything else. The router that classifies these already
+   exists (100% on the golden slices) — wiring it to retrieval configs is the next step.
+
+**Operative production champion: Grand (0.577) for basic/multi_hop, Champion (decomposition)
+routed in for cross_company.** M3's job: wire that routing and calibrate the LLM judge.
+
 ## M1 — text-only retrieval baseline (2026-07-02)
 
 **Corpus:** latest 10-K for 5 semiconductor companies (NVDA, AMD, INTC, MU, QCOM).

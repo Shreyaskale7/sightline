@@ -61,6 +61,53 @@ def _make_retrieve_fn(name: str):
 
         return fn_filtered, rf.close
 
+    if name == "dense_rerank":
+        # Isolates the reranker's contribution: dense+filter top-20 -> cross-encoder, NO visual.
+        # Compared against hybrid_tv_rerank, this reveals whether the visual leg adds anything.
+        from sightline.retrieval.filters import parse_query_filters, to_qdrant_filter
+        from sightline.retrieval.rerank import Reranker
+
+        rr = TextRetriever()
+        if rr.count() == 0:
+            raise SystemExit("Index is empty — build scripts/index.py first.")
+        store_r = MetadataStore(settings.data_dir / "sightline.db")
+        reranker_r = Reranker()
+
+        def fn_dr(query: str, k: int = 5):
+            hits = rr.retrieve(query, k=20, query_filter=to_qdrant_filter(parse_query_filters(query)))
+            pairs = [(h, (p.text if (p := store_r.get_page(h.accession, h.page_no)) else "")) for h in hits]
+            return reranker_r.rerank(query, pairs, k=k)
+
+        def cleanup_dr():
+            rr.close()
+            store_r.close()
+
+        return fn_dr, cleanup_dr
+
+    if name == "grand":
+        # All winning levers stacked: chunked embeddings + metadata filter + router-driven
+        # decomposition (per-company/filing fan-out) -> candidate pool -> cross-encoder rerank.
+        # No visual leg — the ablation showed it dilutes precision on this corpus/model.
+        from sightline.retrieval.decompose import decomposed_retrieve
+        from sightline.retrieval.rerank import Reranker
+
+        rg = TextRetriever(chunked=True)
+        if rg.count() == 0:
+            raise SystemExit("Chunked index empty — build scripts/index.py --chunked first.")
+        store_g = MetadataStore(settings.data_dir / "sightline.db")
+        reranker_g = Reranker()
+
+        def fn_grand(query: str, k: int = 5):
+            fused = decomposed_retrieve(query, 20, rg.retrieve, store_g.list_accessions)
+            pairs = [(h, (p.text if (p := store_g.get_page(h.accession, h.page_no)) else "")) for h in fused]
+            return reranker_g.rerank(query, pairs, k=k)
+
+        def cleanup_grand():
+            rg.close()
+            store_g.close()
+
+        return fn_grand, cleanup_grand
+
     if name in ("planned", "champion"):
         # Deterministic decomposition: per-company / per-filing fan-out + interleave.
         # champion = decomposition on top of CHUNKED embeddings (both improvements stacked).
