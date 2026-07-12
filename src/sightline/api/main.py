@@ -29,6 +29,7 @@ class Citation(BaseModel):
     accession: str
     page_no: int
     image_url: str = ""  # where the UI can fetch the cited page's PNG
+    boxes: list[list[float]] = []  # normalized [x0,y0,x1,y1] regions to highlight on the image
 
 
 class QueryResponse(BaseModel):
@@ -95,12 +96,16 @@ def query(req: QueryRequest) -> QueryResponse:
             s["forced_abstain"] = verdict.forced_abstain
             s["dropped_citations"] = verdict.dropped_citations
         result = verdict.result
-        return QueryResponse(
-            answer=result.answer,
-            citations=[
-                Citation(accession=c.accession, page_no=c.page_no,
-                         image_url=f"/pages/{c.accession}/{c.page_no}")
-                for c in result.citations
-            ],
-            abstained=result.abstained,
-        )
+
+        # Region highlighting: locate the answer's salient figures on each cited page.
+        from ..highlight import page_boxes, salient_terms
+
+        terms = salient_terms(result.answer)
+        page_by_id = {(p.accession, p.page_no): p for p in pages}
+        citations = []
+        for c in result.citations:
+            p = page_by_id.get((c.accession, c.page_no))
+            boxes = page_boxes(p.image_path, c.page_no, terms) if p else []
+            citations.append(Citation(accession=c.accession, page_no=c.page_no,
+                                      image_url=f"/pages/{c.accession}/{c.page_no}", boxes=boxes))
+        return QueryResponse(answer=result.answer, citations=citations, abstained=result.abstained)

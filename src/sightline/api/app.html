@@ -114,9 +114,20 @@
     padding: 0; max-width: min(920px, 92vw); max-height: 92vh; overflow: auto;
   }
   dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(4px); }
-  dialog img { display: block; width: 100%; background: #fff; }
-  dialog .cap { padding: .8rem 1.2rem; font-size: .85rem; color: var(--muted); display: flex; justify-content: space-between; }
-  dialog .cap button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: .3rem .9rem; cursor: pointer; }
+  .zoomwrap { position: relative; line-height: 0; }
+  .zoomwrap img { display: block; width: 100%; background: #fff; }
+  .boxes { position: absolute; inset: 0; pointer-events: none; }
+  .box {
+    position: absolute; border: 2px solid var(--accent-2);
+    background: rgba(56,225,198,.16); border-radius: 2px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.04);
+    animation: boxin .4s ease both;
+  }
+  @keyframes boxin { from { opacity: 0; transform: scale(1.04); } }
+  dialog .cap { padding: .8rem 1.2rem; font-size: .85rem; color: var(--muted); display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+  dialog .cap button { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: .3rem .9rem; cursor: pointer; white-space: nowrap; }
+  .cite .flag { position: absolute; top: .5rem; right: .5rem; background: rgba(56,225,198,.9); color: #04211c; font-size: .62rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
+  .cite { position: relative; }
 </style>
 </head>
 <body>
@@ -168,7 +179,7 @@
 </div>
 
 <dialog id="zoom">
-  <img id="zoomimg" alt="cited page, full size">
+  <div class="zoomwrap"><img id="zoomimg" alt="cited page, full size"><div class="boxes" id="boxes"></div></div>
   <div class="cap"><span id="zoomcap"></span><button onclick="zoom.close()">Close ✕</button></div>
 </dialog>
 
@@ -176,7 +187,7 @@
 const f = document.getElementById("f"), q = document.getElementById("q"),
       go = document.getElementById("go"), out = document.getElementById("out"),
       zoom = document.getElementById("zoom"), zoomimg = document.getElementById("zoomimg"),
-      zoomcap = document.getElementById("zoomcap");
+      zoomcap = document.getElementById("zoomcap"), boxesEl = document.getElementById("boxes");
 
 document.querySelectorAll(".ex").forEach(b =>
   b.addEventListener("click", () => { q.value = b.dataset.q; f.requestSubmit(); }));
@@ -201,14 +212,22 @@ f.addEventListener("submit", async (e) => {
       </div>`;
     if (d.citations.length) {
       html += `<div class="cgrid">` + d.citations.map(c => `
-        <figure class="cite" data-src="${c.image_url}" data-cap="${c.accession} · page ${c.page_no}">
+        <figure class="cite" data-src="${c.image_url}" data-cap="${c.accession} · page ${c.page_no}"
+                data-boxes='${JSON.stringify(c.boxes || [])}'>
+          ${(c.boxes && c.boxes.length) ? `<span class="flag">◆ ${c.boxes.length} region${c.boxes.length===1?"":"s"}</span>` : ""}
           <img loading="lazy" src="${c.image_url}" alt="cited page ${c.page_no}">
           <figcaption><b>Page ${c.page_no}</b>${c.accession}</figcaption>
         </figure>`).join("") + `</div>`;
     }
     out.innerHTML = html;
     out.querySelectorAll(".cite").forEach(el => el.addEventListener("click", () => {
-      zoomimg.src = el.dataset.src; zoomcap.textContent = el.dataset.cap; zoom.showModal();
+      zoomimg.src = el.dataset.src;
+      const boxes = JSON.parse(el.dataset.boxes || "[]");
+      zoomcap.textContent = el.dataset.cap + (boxes.length ? `  ·  ◆ ${boxes.length} highlighted region${boxes.length===1?"":"s"} — where the answer was found` : "");
+      boxesEl.innerHTML = boxes.map(b =>
+        `<div class="box" style="left:${b[0]*100}%;top:${b[1]*100}%;width:${(b[2]-b[0])*100}%;height:${(b[3]-b[1])*100}%"></div>`
+      ).join("");
+      zoom.showModal();
     }));
   } catch (err) {
     out.innerHTML = `<div class="answer abstain"><div class="alabel">Error</div><p class="txt">${esc(String(err))}</p></div>`;
