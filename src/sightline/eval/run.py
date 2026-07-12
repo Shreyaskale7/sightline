@@ -228,7 +228,8 @@ def _make_retrieve_fn(name: str):
                      f"(expected dense | bm25 | hybrid | visual | hybrid_tv)")
 
 
-def run(golden_path: Path = GOLDEN, retriever_name: str = "dense") -> None:
+def run(golden_path: Path = GOLDEN, retriever_name: str = "dense",
+        json_out: Path | None = None) -> None:
     cases = load_golden_set(golden_path)
     console.print(f"[bold]Loaded {len(cases)} eval cases[/bold] — "
                   f"retriever: [bold]{retriever_name}[/bold]")
@@ -256,6 +257,20 @@ def run(golden_path: Path = GOLDEN, retriever_name: str = "dense") -> None:
 
         _print_metrics(per_slice, n_cases=len(retrieval_cases), n_unanswerable=n_unanswerable,
                        retriever_name=retriever_name)
+
+        if json_out is not None:
+            import json
+
+            all_rows = [s for rows in per_slice.values() for s in rows]
+            metrics = {
+                "retriever": retriever_name,
+                "n": len(all_rows),
+                "recall@5": round(_mean(all_rows, 0), 4),
+                "ndcg@10": round(_mean(all_rows, 1), 4),
+                "mrr": round(_mean(all_rows, 2), 4),
+            }
+            Path(json_out).write_text(json.dumps(metrics, indent=2) + "\n")
+            console.print(f"[dim]wrote metrics -> {json_out}[/dim]")
     finally:
         cleanup()
 
@@ -403,15 +418,16 @@ if __name__ == "__main__":
 
     args = sys.argv[1:]
     name = args[args.index("--retriever") + 1] if "--retriever" in args else "dense"
+    json_out = Path(args[args.index("--json") + 1]) if "--json" in args else None
     if "--ablation" in args:
         for n in ("bm25", "dense", "dense_filtered", "dense_chunked_filtered", "planned",
-                  "champion", "hybrid", "visual", "visual_filtered", "hybrid_tv",
-                  "hybrid_tv_rerank"):
+                  "champion", "routed", "grand", "hybrid", "visual", "visual_filtered",
+                  "hybrid_tv", "hybrid_tv_rerank"):
             try:
                 run(retriever_name=n)
             except SystemExit as e:  # e.g. visual index not built yet — skip, keep the rest
                 console.print(f"[yellow]skipping {n}: {e}[/yellow]")
     else:
-        run(retriever_name=name)
+        run(retriever_name=name, json_out=json_out)
     if "--generation" in args:
         run_generation()  # the paid pass (needs LLM_API_KEY)
