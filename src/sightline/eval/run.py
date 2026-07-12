@@ -84,6 +84,13 @@ def _make_retrieve_fn(name: str):
 
         return fn_dr, cleanup_dr
 
+    if name == "routed":
+        # Config-routing: comparison -> decomposition (no rerank), else grand (rerank).
+        from sightline.retrieval.routed import RoutedRetriever
+
+        rr = RoutedRetriever()
+        return rr.retrieve, rr.close
+
     if name == "grand":
         # All winning levers stacked: chunked embeddings + metadata filter + router-driven
         # decomposition (per-company/filing fan-out) -> candidate pool -> cross-encoder rerank.

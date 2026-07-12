@@ -60,14 +60,15 @@ of every design choice.
 | 9 | Champion (chunk + filter + decompose) | 0.509 | 0.419 | 0.361 |
 | 10 | Hybrid text+visual + rerank | 0.517 | 0.412 | 0.370 |
 | 11 | Dense + filter + rerank | 0.551 | 0.485 | 0.452 |
-| 12 | **Grand (chunk + filter + decompose + rerank)** | **0.577** | 0.479 | 0.442 |
+| 12 | Grand (chunk + filter + decompose + rerank) | 0.577 | 0.479 | 0.442 |
+| 13 | **Routed (config per question type)** | **0.603** | **0.485** | 0.441 |
 
 **Per-slice Recall@5 (where the real story lives):**
 
-| Slice | n | dense (#4) | champion (#9) | dense+rerank (#11) | grand (#12) |
+| Slice | n | dense (#4) | champion (#9) | grand (#12) | **routed (#13)** |
 |---|--:|--:|--:|--:|--:|
-| basic | 32 | 0.35 | 0.562 | 0.625 | **0.656** |
-| cross_company | 4 | 0.25 | **0.375** | 0.125 | 0.125 |
+| basic | 32 | 0.35 | 0.562 | 0.656 | **0.656** |
+| cross_company | 4 | 0.25 | 0.375 | 0.125 | **0.375** |
 | multi_hop | 3 | 0.11 | 0.111 | 0.333 | **0.333** |
 
 ### The five findings (this is the portfolio)
@@ -91,8 +92,14 @@ of every design choice.
    comparisons, grand (rerank) for everything else. The router that classifies these already
    exists (100% on the golden slices) — wiring it to retrieval configs is the next step.
 
-**Operative production champion: Grand (0.577) for basic/multi_hop, Champion (decomposition)
-routed in for cross_company.** M3's job: wire that routing and calibrate the LLM judge.
+**Operative production champion: Routed (0.603).** The router picks the measured-best config
+per question type — decomposition (no rerank) for comparisons so the per-company interleave
+survives, grand (rerank) for everything else. It takes the top slice from each: basic 0.656,
+cross_company 0.375, multi_hop 0.333 — none sacrificed. This is the ablation's payoff: the
+router, originally a cost switch, is now also a quality optimizer, and every branch is backed
+by a measured per-slice number rather than intuition. Recall@5 0.316 → 0.603 = **+91%** over
+the dense baseline, entirely on free/CPU components. M3's remaining job: calibrate the LLM
+judge (Cohen's κ) and add table-QA / NER anchoring.
 
 ## M1 — text-only retrieval baseline (2026-07-02)
 

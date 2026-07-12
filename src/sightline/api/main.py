@@ -78,19 +78,16 @@ def query(req: QueryRequest) -> QueryResponse:
     from ..answerer import Answerer
     from ..config import settings
     from ..ingest.store import MetadataStore
-    from ..retrieval.decompose import decomposed_retrieve
-    from ..retrieval.text_baseline import TextRetriever
+    from ..retrieval.routed import RoutedRetriever
     from ..verify import verify
 
     with span("query", question=req.question, k=req.k):
-        # Champion retrieval config: metadata filter + router-driven decomposition
-        # (comparison questions fan out per company, trends per filing).
-        with MetadataStore(settings.data_dir / "sightline.db") as store, \
-             TextRetriever() as retriever:
+        # Champion retrieval config (measured Recall@5 0.603): the router picks the best-per-slice
+        # config — decomposition for comparisons, chunk+rerank for everything else.
+        with RoutedRetriever() as retriever:
             with span("retrieve", k=req.k):
-                hits = decomposed_retrieve(
-                    req.question, req.k, retriever.retrieve, store.list_accessions
-                )
+                hits = retriever.retrieve(req.question, k=req.k)
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
             pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
         result = Answerer().answer(req.question, pages)
         with span("verify") as s:
