@@ -93,6 +93,18 @@
   .answer p.txt { line-height: 1.7; font-size: 1.02rem; }
   .meta { margin-top: .9rem; font-size: .78rem; color: var(--muted); }
 
+  .trace {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+    margin: 0 0 1.4rem; padding: .7rem .9rem; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--bg-soft);
+  }
+  .trace .tlabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-right: .3rem; }
+  .tstage { display: inline-flex; align-items: baseline; gap: .35rem; font-size: .78rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: .28rem .6rem; }
+  .tstage b { font-weight: 600; }
+  .tstage em { font-style: normal; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+  .tstage .d { color: var(--muted); }
+  .tarrow { color: var(--accent); font-size: .8rem; }
   .cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; }
   .cite {
     border: 1px solid var(--border); border-radius: 12px; overflow: hidden; cursor: zoom-in;
@@ -210,6 +222,16 @@ f.addEventListener("submit", async (e) => {
         <p class="txt">${esc(d.answer)}</p>
         <div class="meta">${d.citations.length} citation${d.citations.length === 1 ? "" : "s"} · ${ms}s · retrieve → answer → verify</div>
       </div>`;
+    if (d.trace && d.trace.length) {
+      html += `<div class="trace"><span class="tlabel">trace</span>` +
+        d.trace.map(s => {
+          const det = s.detail && s.detail.decision ? ` <span class="d">${s.detail.decision}</span>`
+                    : s.detail && s.detail.n_candidates != null ? ` <span class="d">${s.detail.n_candidates} cand</span>`
+                    : s.detail && s.detail.n_boxes != null ? ` <span class="d">${s.detail.n_boxes} box</span>`
+                    : s.detail && s.detail.forced_abstain != null ? ` <span class="d">${s.detail.forced_abstain ? "abstain" : "ok"}</span>` : "";
+          return `<span class="tstage"><b>${esc(s.name)}</b>${det}<em>${s.latency_ms}ms</em></span>`;
+        }).join(`<span class="tarrow">→</span>`) + `</div>`;
+    }
     if (d.citations.length) {
       html += `<div class="cgrid">` + d.citations.map(c => `
         <figure class="cite" data-src="${c.image_url}" data-cap="${c.accession} · page ${c.page_no}"

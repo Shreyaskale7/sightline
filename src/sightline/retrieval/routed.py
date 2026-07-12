@@ -20,6 +20,7 @@ from pathlib import Path
 
 from ..agents.router import Route, route
 from ..config import settings
+from ..observability import span
 from .decompose import decomposed_retrieve
 from .text_baseline import Hit, TextRetriever
 
@@ -44,13 +45,26 @@ class RoutedRetriever:
         return self._reranker.rerank(query, pairs, k=k)
 
     def retrieve(self, query: str, k: int = 5) -> list[Hit]:
-        decision = route(query)
+        with span("route") as s:
+            decision = route(query)
+            s["decision"] = decision.route.value
+            s["reason"] = decision.reason
+            s["tickers"] = decision.tickers
         # Fan out per company/filing regardless — decomposition never hurts recall of candidates.
-        candidates = decomposed_retrieve(query, 20, self._chunked.retrieve, self._store.list_accessions)
+        with span("retrieve.candidates") as s:
+            candidates = decomposed_retrieve(
+                query, 20, self._chunked.retrieve, self._store.list_accessions
+            )
+            s["n_candidates"] = len(candidates)
         if decision.route is Route.COMPARISON:
             # Reranking would re-crowd one company out; keep the interleaved order, take top-k.
+            with span("rerank") as s:
+                s["skipped"] = "comparison — preserving per-company interleave"
             return candidates[:k]
-        return self._rerank(query, candidates, k)
+        with span("rerank") as s:
+            out = self._rerank(query, candidates, k)
+            s["reranked_to"] = len(out)
+        return out
 
     def close(self) -> None:
         self._chunked.close()
