@@ -3,6 +3,21 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — see the prime directive in `CLAUDE.md`.
 
+## M4 — the money-shot (2026-07-10)
+
+The point of the two-stage retrieve (cheap text prefilter → VLM reads only the top-k) is cost.
+`python scripts/moneyshot.py` quantifies it. At **gpt-4o** vision prices on our 1,345-page
+corpus, answering one question:
+
+| Approach | Pages the VLM reads | $/query | $/1k queries |
+|---|--:|--:|--:|
+| Naive VLM over every page | 1,345 | $3.72 | $3,719 |
+| Sightline two-stage retrieve (k=5) | 5 | $0.017 | $17 |
+
+**→ 99.5% cheaper per query.** Our actual stack runs free models, so the real bill is ~$0 —
+this is the *architectural* saving, shown at a paid model's prices so it's legible. The number
+scales with k and holds (>95% reduction) across gpt-4o / claude-sonnet / gemini-flash pricing.
+
 ## M2 — retrieval ablation, text side (2026-07-07)
 
 **Corpus:** 20 filings / 1,329 pages. **Exam:** 44-case golden set (39 answerable). All configs

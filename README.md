@@ -4,6 +4,13 @@ A visual-first document-intelligence system over SEC filings. It answers analyst
 about 10-Ks and 10-Qs by retrieving and reasoning over **page images** (OCR-free, layout-preserving)
 and returns answers with page-level citations — or honestly abstains when the corpus can't support one.
 
+> **The numbers** (44-case benchmark over 20 filings / 1,329 pages, all on free/CPU models):
+> retrieval **Recall@5 0.603** (a measured **+91%** over the dense baseline, via a router that
+> picks the best config per question type), generation **correctness 0.65 / abstention recall
+> 0.80**, at a two-stage-retrieve cost that is **99.5% cheaper** than sending every page to a
+> VLM. Every number is reproducible (`docs/RESULTS.md`) — including a benched BM25 row and a
+> visual retriever that was *measured out* of the champion config rather than assumed in.
+
 > New here? Read `docs/DESIGN_DOC.md` (the what/why) and `docs/IMPLEMENTATION_PLAN.md` (the how).
 > If you're using Claude Code, `CLAUDE.md` has the full context and build order.
 
