@@ -280,17 +280,18 @@ def _mean(rows: list[tuple[float, float, float]], i: int) -> float:
 
 
 def run_generation(golden_path: Path = GOLDEN, k: int = 5) -> None:
-    """End-to-end answer quality over the golden set. Costs a few cents (one Claude call per
-    case + one cheap judge call per answered case)."""
+    """End-to-end answer quality over the golden set, on the CHAMPION retrieval config
+    (routed, R@5 0.603) — generation is retrieval-bound, so it gets the best retrieval.
+    Costs a few cents (one LLM call per case + a judge call per answered prose case)."""
     from sightline.answerer import Answerer
     from sightline.config import settings
     from sightline.ingest.store import MetadataStore
-    from sightline.retrieval.text_baseline import TextRetriever
+    from sightline.retrieval.routed import RoutedRetriever
 
     from .judge import Judge, numeric_match
 
     cases = load_golden_set(golden_path)
-    retriever = TextRetriever()
+    retriever = RoutedRetriever()
     store = MetadataStore(settings.data_dir / "sightline.db")
     answerer = Answerer()
     judge = Judge()
