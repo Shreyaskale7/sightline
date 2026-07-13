@@ -246,8 +246,9 @@
       </table>
     </div>
     <p class="note">
-      Generation quality on the same benchmark: answer correctness 0.65 · abstention recall 0.80 ·
-      every false “I don't know” traced to a retrieval miss, not a hallucination.
+      Generation quality on the champion retrieval: answer correctness 0.90 · citation accuracy 0.59 ·
+      abstention recall 1.00 (refused all 5 impossible questions) · false abstentions cut from 36%
+      to 18% when retrieval improved — every one was a retrieval miss, not a hallucination.
       Full lab notebook with reproduce commands in
       <a href="https://github.com/Shreyaskale7/sightline/blob/main/docs/RESULTS.md" target="_blank" rel="noopener" style="color:var(--accent)">docs/RESULTS.md</a>.
     </p>

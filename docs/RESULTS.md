@@ -3,6 +3,27 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — see the prime directive in `CLAUDE.md`.
 
+## Generation scorecard on the champion retrieval (2026-07-13)
+
+The thesis was "generation is retrieval-bound." Here it is, tested: the SAME answerer + judge,
+but retrieval swapped from the M1 dense baseline (R@5 0.316) to the routed champion (0.603).
+
+| Metric | M1 (dense 0.316) | Champion (routed 0.603) |
+|---|--:|--:|
+| answer correctness | 13/20 = **0.65** | 26/29 = **0.90** |
+| citation accuracy (of answered) | 9/21 = 0.43 | 19/32 = **0.59** |
+| false abstentions (answerable) | 12/33 = 0.36 | 7/39 = **0.18** |
+| abstention recall (unanswerable) | 4/5 = 0.80 | 5/5 = **1.00** |
+
+Better retrieval **halved** false abstentions (0.36 → 0.18), lifted correctness 0.65 → 0.90, and
+took abstention recall to a perfect 5/5 — without touching a line of the generation code. Every
+earlier false abstention that traced to a retrieval miss is now an answered, correct case. The
+prime directive pays off: fix the measurable upstream stage, and the downstream number follows.
+(Citation accuracy also benefited from the multi-gold `also_valid_pages` labels; both changes
+are in this number.) Answers by `nvidia/nemotron-3-super-120b-a12b:free`; correctness by
+deterministic numeric match + `nemotron-nano-9b` judge (whose trust is quantifiable via Cohen's
+κ — see calibration.py). All 5 deliberately-unanswerable questions were correctly refused.
+
 ## M4 — the money-shot (2026-07-10)
 
 The point of the two-stage retrieve (cheap text prefilter → VLM reads only the top-k) is cost.

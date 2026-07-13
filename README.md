@@ -6,8 +6,8 @@ and returns answers with page-level citations — or honestly abstains when the 
 
 > **The numbers** (44-case benchmark over 20 filings / 1,329 pages, all on free/CPU models):
 > retrieval **Recall@5 0.603** (a measured **+91%** over the dense baseline, via a router that
-> picks the best config per question type), generation **correctness 0.65 / abstention recall
-> 0.80**, at a two-stage-retrieve cost that is **99.5% cheaper** than sending every page to a
+> picks the best config per question type), generation **correctness 0.90 / abstention recall
+> 1.00**, at a two-stage-retrieve cost that is **99.5% cheaper** than sending every page to a
 > VLM. Every number is reproducible (`docs/RESULTS.md`) — including a benched BM25 row and a
 > visual retriever that was *measured out* of the champion config rather than assumed in.
 
