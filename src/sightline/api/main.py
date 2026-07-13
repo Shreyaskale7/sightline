@@ -24,24 +24,37 @@ _APP_HTML = Path(__file__).parent / "app.html"
 
 # Load the retriever (embedding + reranker models, Qdrant client) ONCE and reuse it — otherwise
 # every request pays ~20s of model-load. Embedded Qdrant is single-client-per-path, so one
-# shared instance is also the only correct option. A lock serializes queries (the embedded DB
-# and the CPU models aren't built for true concurrency) — fine for a single-worker demo.
+# shared instance is also the only correct option.
+#
+# Two separate locks (must not be one, or /query would deadlock calling _get_retriever while
+# holding it):
+#   _build_lock — guards single construction (double-checked). Construction is slow (~20s), and
+#     assignment happens only after it finishes, so warmup and the first request would otherwise
+#     BOTH try to build and collide on the Qdrant path lock.
+#   _query_lock — serializes queries (the embedded DB + CPU models aren't built for concurrency).
 _retriever = None
-_retriever_lock = threading.Lock()
+_build_lock = threading.Lock()
+_query_lock = threading.Lock()
 
 
 def _get_retriever():
     global _retriever
     if _retriever is None:
-        from ..retrieval.routed import RoutedRetriever
+        with _build_lock:
+            if _retriever is None:  # double-checked: only the first caller builds
+                from ..retrieval.routed import RoutedRetriever
 
-        _retriever = RoutedRetriever()
+                _retriever = RoutedRetriever()
     return _retriever
 
 
 def _warmup_target() -> None:
     try:
-        _get_retriever()
+        # A real dummy query forces EVERY lazy model to load now (the embedder AND the
+        # cross-encoder reranker, which only loads on first .rerank()) — otherwise the first
+        # real user's query pays ~40s of reranker load instead of the ~5s warm compute.
+        _get_retriever().retrieve("warmup: total revenue", k=5)
+        print("[warmup] models hot")
     except Exception as e:  # missing index/models (e.g. CI) shouldn't crash a background thread
         print(f"[warmup] skipped: {e}")
 
@@ -128,7 +141,7 @@ def query(req: QueryRequest) -> QueryResponse:
     t0 = time.perf_counter()
     # Serialize: the shared retriever holds an embedded-Qdrant client + CPU models, not built
     # for concurrent access. A demo is low-QPS; correctness beats throughput here.
-    with _retriever_lock, trace("query", question=req.question, k=req.k) as stages:
+    with _query_lock, trace("query", question=req.question, k=req.k) as stages:
         # Champion retrieval config (measured Recall@5 0.603): the router picks the best-per-slice
         # config — decomposition for comparisons, chunk+rerank for everything else.
         retriever = _get_retriever()

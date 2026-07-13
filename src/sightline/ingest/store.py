@@ -65,7 +65,11 @@ class MetadataStore:
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path)
+        # check_same_thread=False: the API keeps one long-lived store on the shared retriever
+        # singleton and serves requests from a threadpool, so the connection is created in one
+        # thread and used in another. Safe here because the API serializes queries under a lock
+        # (main.py: _retriever_lock) — no concurrent access to this connection.
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")  # so ON DELETE CASCADE actually fires
         self._conn.executescript(_SCHEMA)

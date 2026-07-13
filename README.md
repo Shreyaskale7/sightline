@@ -20,15 +20,40 @@ mangle exactly those. Sightline treats each page as an image and retrieves on la
 late-interaction visual retrieval (the ColPali / ColQwen family). The differentiator over a typical
 RAG project is the **evaluation harness**: everything is measured, and every improvement is proven.
 
-## Status
-**M1 (text baseline + eval harness): built and measured.** Corpus: 20 SEC filings / 1,329 page
-images across NVDA, AMD, INTC, MU, QCOM. Golden set: 38 hand-verified cases. Text-only dense
-retrieval baseline: **Recall@5 0.313** — with two measured negative findings along the way
-(BM25 hurts on table-heavy gold pages; the text baseline degrades 0.567→0.313 as the corpus
-grows 2.6×). Generation (cited answers + abstention) runs on a $0 free-model stack with a
-response cache. **M2 (visual retrieval) in progress:** ColModernVBERT late-interaction
-retriever + cross-encoder reranker scaffolded; the six-way ablation is next.
-Full numbers and history: `docs/RESULTS.md`.
+## Pipeline
+
+```mermaid
+flowchart LR
+    Q[Question] --> R{Router}
+    R -->|comparison| P[Decompose<br/>per company/filing]
+    R -->|simple / multi-hop| P
+    P --> RET[Retrieve<br/>chunked BGE + metadata filter]
+    RET -->|comparison| K[top-k]
+    RET -->|else| RR[Cross-encoder<br/>rerank]
+    RR --> K
+    K --> A[Answerer<br/>grounded, cited]
+    A --> V{Verifier<br/>every claim cited?}
+    V -->|no| ABS[Abstain]
+    V -->|yes| ANS[Answer + cited page images<br/>+ highlighted regions]
+    subgraph obs [every stage → one trace: router → retrieval → rerank → answer → verify]
+    end
+```
+
+Retrieval config is chosen **per question type** (the router doubles as a quality optimizer);
+the answer never ships unless the verifier confirms every claim is cited, else it abstains.
+
+## Status — M1–M4 done, M5 all but deploy/Loom
+| Milestone | State |
+|---|---|
+| M0 Scaffold · M1 Baseline+eval | ✅ done |
+| M2 Visual + hybrid retrieval | ✅ 13-config ablation; **champion Recall@5 0.603 (+91%)** |
+| M3 Agents + grounding | router · verifier · decomposition · config-routing ✅; Cohen's κ harness built (needs human labels) |
+| M4 LLMOps | money-shot (99.5% cheaper) · CI eval gate · rendered trace · prompt registry · cache ✅ |
+| M5 Serving + UI | landing + console · region highlighting · load-once serving · Dockerfile ✅; deploy + Loom pending |
+
+Corpus: 20 SEC filings / 1,329 page images (NVDA/AMD/INTC/MU/QCOM). 44-case hand-verified
+benchmark. All on **free/CPU models** (total build spend: $0.22). Full numbers, the ablation
+table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Quickstart
 ```bash
