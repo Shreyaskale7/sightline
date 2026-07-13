@@ -38,13 +38,20 @@ the corpus can't support an answer.
   *hurts* in fusion — measured, not assumed; metadata filter + chunking are cheap real wins;
   reranking undoes decomposition's cross-company gain → motivates config-routing in M3.
   Full table in `docs/RESULTS.md`.
-- [ ] **M3 — Agents + grounding**: LangGraph router → planner → answerer → verifier → synthesis;
-  table-QA path; NER for citation anchoring; LLM-as-judge calibrated against human labels (Cohen's κ).
-- [ ] **M4 — LLMOps**: cost/latency dashboard + money-shot metric, prompt registry, CI eval gate,
-  semantic + embedding caches.
-- [ ] **M5 — Serving + demo UI**: async FastAPI + SSE streaming; UI with inline cited page images and
-  region highlighting; 3-minute Loom.
-- [ ] **M6 — Stretch**: fine-tune reranker, self-growing eval set, multi-tenant corpora, filing diffs.
+- [~] **M3 — Agents + grounding**: router ✅ (deterministic, 100% on slices), verifier ✅
+  (no uncited answer ships), decomposition/planner ✅, config-routing ✅. Champion generation:
+  correctness 0.90, abstention recall 1.00. Cohen's κ harness built (`eval/calibration.py`) —
+  **needs the human's blind labels to produce the κ number**. Remaining/optional: table-QA path,
+  NER anchoring (add only if evals demand).
+- [x] **M4 — LLMOps**: ✅ money-shot (99.5% cheaper, `cost.py`), CI eval gate (blocks metric
+  regressions, `eval/gate.py`), response cache + throttle (`llm.py`), rendered trace in the
+  `/query` response, prompt registry (`prompts.py`). Optional: hosted Langfuse wiring.
+- [~] **M5 — Serving + demo UI**: ✅ landing (`/`) + console (`/app`), inline cited page images,
+  **region highlighting** (`highlight.py`), trace panel, model-load-once serving + warmup,
+  Dockerfile + `docs/DEPLOY.md`. **Remaining (need the human): actually deploy + record the
+  3-min Loom.** SSE streaming optional.
+- [ ] **M6 — Stretch**: fine-tune reranker, self-growing eval set, multi-tenant corpora, filing
+  diffs, GPU ColQwen (the scoped path to a visual-retrieval win).
 
 Update the checkboxes as milestones complete. Tag `v1.0` after M5 before touching M6.
 
