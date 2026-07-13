@@ -28,6 +28,8 @@ from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 from .config import settings
+# Prompts live in the registry (prompts.py) so eval numbers pin to a prompt version.
+from .prompts import ANSWERER_V1, ANSWERER_VISUAL_V1
 from .observability import span
 
 # The model must tag claims like: [p:0001045810-26-000021#51]
@@ -38,34 +40,8 @@ _ABSTAIN_TOKEN = "ABSTAIN"
 # guards against pathological pages blowing up cost. (Cost discipline is a hard constraint.)
 _MAX_PAGE_CHARS = 6000
 
-_PROMPT = """\
-You are a careful financial-filings analyst. Answer the question using ONLY the numbered
-filing pages provided below. Rules:
-
-1. Every factual claim in your answer MUST be followed by a citation tag of the exact form
-   [p:ACCESSION#PAGE] copied from the page header it came from.
-2. Use only what the pages say. Do not use outside knowledge, and do not extrapolate.
-3. If the provided pages do not contain the information needed to answer, reply with the
-   single word {abstain} and nothing else.
-4. Be concise: one to three sentences.
-
-{pages}
-
-Question: {question}
-"""
-
-_VISUAL_INSTRUCTIONS = """\
-You are a careful financial-filings analyst. Answer the question using ONLY the filing page
-IMAGES provided below. Each image is preceded by a label of the form [p:ACCESSION#PAGE].
-Rules:
-
-1. Every factual claim in your answer MUST be followed by the citation tag (exact form
-   [p:ACCESSION#PAGE]) of the page image it came from.
-2. Use only what the page images show. Do not use outside knowledge, and do not extrapolate.
-3. If the page images do not contain the information needed to answer, reply with the single
-   word {abstain} and nothing else.
-4. Be concise: one to three sentences.
-"""
+_PROMPT = ANSWERER_V1.text
+_VISUAL_INSTRUCTIONS = ANSWERER_VISUAL_V1.text
 
 _MAX_IMAGE_WIDTH = 1024  # downscale before sending: filings stay legible, tokens stay sane
 

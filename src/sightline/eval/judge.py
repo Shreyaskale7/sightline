@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 
 from ..config import settings
+# Prompt lives in the registry (prompts.py) so κ calibration pins to a judge-prompt version.
+from ..prompts import JUDGE_V1
 
 _NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -47,19 +49,7 @@ def numeric_match(gold: str, answer: str) -> bool | None:
     ans |= {round(n, 1) for n in _numbers(answer)}
     return bool(acceptable & ans)
 
-_JUDGE_PROMPT = """\
-You are grading a question-answering system on SEC filings.
-
-Question: {question}
-Gold (reference) answer: {gold}
-System's answer: {answer}
-
-Does the system's answer state the same essential fact(s) as the gold answer? Minor wording,
-rounding (e.g. "$215,938 million" vs "$216 billion"), or extra correct context are fine.
-Contradicting or omitting the essential fact is a fail.
-
-Reply with exactly one word: CORRECT or INCORRECT.
-"""
+_JUDGE_PROMPT = JUDGE_V1.text
 
 
 class Judge:
