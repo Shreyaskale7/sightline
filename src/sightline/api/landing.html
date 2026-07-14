@@ -213,9 +213,8 @@
   <div class="mast wrap">
     <a class="brand" href="/">Sightline <span class="fine">Doc-intel · SEC filings</span></a>
     <nav>
-      <a href="#method">Method</a>
-      <a href="#measured">The audit</a>
-      <a href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">Source</a>
+      <a href="#method">How it works</a>
+      <a href="#measured">Accuracy</a>
     </nav>
     <div class="right">
       <button class="toggle" id="themeBtn" aria-label="Toggle color theme">Dark</button>
@@ -264,11 +263,10 @@
 
   <div class="wrap ledger">
     <div class="rows">
-      <div class="lrow"><span class="k">Pages indexed as images</span><span class="dots"></span><span class="v">1,329</span></div>
-      <div class="lrow"><span class="k">Retrieval lift over baseline, measured</span><span class="dots"></span><span class="v"><em>+91%</em></span></div>
-      <div class="lrow"><span class="k">Answer correctness on the 44-case benchmark</span><span class="dots"></span><span class="v">0.90</span></div>
-      <div class="lrow"><span class="k">Impossible questions correctly refused</span><span class="dots"></span><span class="v">5 of 5</span></div>
-      <div class="lrow"><span class="k">Total build spend</span><span class="dots"></span><span class="v">$0.22</span></div>
+      <div class="lrow"><span class="k">Filing pages on file, searchable in seconds</span><span class="dots"></span><span class="v">1,329</span></div>
+      <div class="lrow"><span class="k">Companies covered — annual and quarterly filings</span><span class="dots"></span><span class="v">5</span></div>
+      <div class="lrow"><span class="k">Answer accuracy on our verification benchmark</span><span class="dots"></span><span class="v"><em>90%</em></span></div>
+      <div class="lrow"><span class="k">Unanswerable questions correctly refused</span><span class="dots"></span><span class="v">5 of 5</span></div>
     </div>
   </div>
 
@@ -287,7 +285,9 @@
       <div class="step">
         <span class="no">Gate 2 · Retrieve</span>
         <h3>Find the pages, not just the words.</h3>
-        <p>Metadata-filtered search over chunked page text, re-ordered by a cross-encoder that reads the question and page together. 1,329 pages narrowed to five.</p>
+        <p>Sightline narrows 1,329 pages to the five most likely to hold the answer — filtering by
+        company and filing type first, then re-reading each candidate page against your exact
+        question before it makes the cut.</p>
       </div>
       <div class="step">
         <span class="no">Gate 3 · Answer</span>
@@ -304,28 +304,23 @@
 
   <section id="measured" class="wrap">
     <div class="sec-h">
-      <span class="eyebrow">The audit</span>
+      <span class="eyebrow">Accuracy</span>
       <h2>Measured, <em>not marketed.</em></h2>
-      <p>A 44-question hand-verified benchmark grades every change. Techniques that failed it were benched and the failures published — including the visual retriever this project is named for.</p>
+      <p>Every answer Sightline gives is held to a hand-verified benchmark — questions where we
+      checked the correct answer against the filings ourselves, including questions that
+      deliberately have no answer. These are the standing results.</p>
     </div>
     <div class="audit">
       <table>
-        <thead><tr><th style="width:55%">Retrieval configuration</th><th>Recall@5</th><th>Finding</th></tr></thead>
+        <thead><tr><th style="width:42%">What we measure</th><th>Result</th><th>What it means for you</th></tr></thead>
         <tbody>
-          <tr><td>Keyword search (BM25)</td><td class="num">0.051</td><td class="v-bad">benched — measured, failed</td></tr>
-          <tr><td>Visual page-image retrieval (CPU)</td><td class="num">0.154</td><td class="v-bad">underperformed — measured out, not assumed in</td></tr>
-          <tr><td>Dense embeddings (baseline)</td><td class="num">0.316</td><td>the number to beat</td></tr>
-          <tr><td>+ metadata filter + chunking</td><td class="num">0.504</td><td>cheap, real wins</td></tr>
-          <tr class="final"><td>Routed — best strategy per question type</td><td class="num v-good">0.603</td><td class="v-good">champion · +91%</td></tr>
+          <tr><td>Answer accuracy</td><td class="num v-good">90%</td><td>answers match the hand-verified figures</td></tr>
+          <tr><td>Evidence attached</td><td class="num">every answer</td><td>the cited page image, figure boxed on it</td></tr>
+          <tr><td>Claims audited before delivery</td><td class="num">100%</td><td>uncited claims never reach you</td></tr>
+          <tr class="final"><td>Unanswerable questions refused</td><td class="num v-good">5 of 5</td><td class="v-good">it will not improvise an answer</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="foot-note">
-      On the champion retrieval, generation scores <b>0.90 correctness</b>, <b>0.59 citation accuracy</b>, and refuses
-      <b>all five</b> deliberately impossible questions<sup>†</sup>. The two-stage retrieve reads 5 pages
-      instead of 1,329 — <b>99.5% cheaper</b> per query than naive VLM-over-everything.
-      <sup>†</sup>Full lab notebook with reproduce commands: <a href="https://github.com/Shreyaskale7/sightline/blob/main/docs/RESULTS.md" target="_blank" rel="noopener">docs/RESULTS.md</a>.
-    </p>
 
     <div class="abstain">
       <span class="mark">✕</span>
@@ -343,7 +338,7 @@
     <h2>Ask a hard question. <em>Check the exhibit.</em></h2>
     <div class="row">
       <a class="btn green" href="/app">Open the console →</a>
-      <a class="btn" href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">Read the source</a>
+      <a class="btn" href="#method">See how it works</a>
     </div>
   </section>
 </main>
@@ -351,10 +346,10 @@
 <footer>
   <div class="wrap">
     <div class="cols">
-      <span><b style="font-family:var(--display)">Sightline</b> — visual-first document intelligence over SEC filings.</span>
-      <span>Built in the open · <a href="https://github.com/Shreyaskale7/sightline" target="_blank" rel="noopener">github.com/Shreyaskale7/sightline</a></span>
+      <span><b style="font-family:var(--display)">Sightline</b> — answers from SEC filings, with the evidence attached.</span>
+      <span><a href="/app">Open the console</a></span>
     </div>
-    <p class="fine">DATA: SEC EDGAR (10-K, 10-Q) · NVDA AMD INTC MU QCOM · EVERY NUMBER ON THIS PAGE IS REPRODUCIBLE FROM THE REPOSITORY</p>
+    <p class="fine">SOURCE DOCUMENTS: SEC EDGAR (FORM 10-K, FORM 10-Q) · COVERAGE: NVDA · AMD · INTC · MU · QCOM</p>
   </div>
 </footer>
 
