@@ -102,10 +102,15 @@ def export_for_labeling(csv_path: str | Path, k: int = 5) -> int:
                 continue
             if numeric_match(c.gold_answer or "", result.answer) is not None:
                 continue  # deterministic grade — not the judge's judgment
-            verdict = judge.is_correct(c.question, c.gold_answer or "", result.answer)
+            try:
+                verdict: int | str = int(judge.is_correct(c.question, c.gold_answer or "", result.answer))
+            except Exception:
+                # Quota/network gave out mid-run — leave the verdict blank rather than losing
+                # every row already collected. You can fill judge + human, or re-run to top up.
+                verdict = ""
             rows.append({
                 "id": c.id, "question": c.question, "gold": c.gold_answer,
-                "answer": result.answer, "judge": int(verdict), "human": "",
+                "answer": result.answer, "judge": verdict, "human": "",
             })
     finally:
         retriever.close()

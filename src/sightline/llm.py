@@ -98,8 +98,18 @@ class _OpenAICompatMessages:
             data = resp.json()
             if "error" in data:  # OpenRouter can return 200 with an embedded error
                 raise RuntimeError(f"LLM gateway error: {data['error']}")
+            choice = data["choices"][0]
+            # Free/gateway models occasionally return null content (content filter, truncation
+            # at max_tokens with reasoning models, transient hiccup). A null here used to crash
+            # callers doing .strip(); coerce to "" so a bad completion degrades to an empty
+            # answer (→ abstain) or a False judge verdict, never a traceback.
+            text = choice.get("message", {}).get("content")
+            if text is None and attempt < self._MAX_RETRIES:
+                time.sleep(backoff)  # give the model another shot before accepting empty
+                backoff *= 2
+                continue
             return _Response(
-                content=[_TextBlock(text=data["choices"][0]["message"]["content"])],
+                content=[_TextBlock(text=text or "")],
                 usage=data.get("usage"),
             )
         raise RuntimeError("unreachable")  # loop always returns or raises

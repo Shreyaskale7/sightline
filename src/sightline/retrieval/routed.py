@@ -32,7 +32,20 @@ class RoutedRetriever:
         from ..ingest.store import MetadataStore
         from .rerank import Reranker
 
-        self._client = QdrantClient(path=str(Path(settings.data_dir) / "qdrant"))
+        qdrant_path = str(Path(settings.data_dir) / "qdrant")
+        try:
+            self._client = QdrantClient(path=qdrant_path)
+        except RuntimeError as e:
+            if "already accessed" in str(e):
+                # Embedded Qdrant is one-process-per-path. The usual cause: a demo server
+                # (make api / uvicorn) is running. Say so plainly instead of a portalocker dump.
+                raise SystemExit(
+                    "The Sightline database is already in use by another process — usually a "
+                    "running server (`make api` / uvicorn). Stop it and try again.\n"
+                    "  Windows:  Get-Process python | Stop-Process -Force\n"
+                    "  macOS/Linux:  pkill -f 'uvicorn sightline'"
+                ) from e
+            raise
         self._chunked = TextRetriever(chunked=True, client=self._client)
         self._store = MetadataStore(settings.data_dir / "sightline.db")
         self._reranker = Reranker()
