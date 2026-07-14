@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
@@ -107,6 +107,45 @@ def home() -> str:
 def console() -> str:
     """The analyst console: ask a question, see the cited page images inline."""
     return _APP_HTML.read_text(encoding="utf-8")
+
+
+class UploadResponse(BaseModel):
+    label: str
+    accession: str
+    pages: int
+    indexed: int
+    already_known: bool = False
+
+
+@app.post("/upload", response_model=UploadResponse)
+async def upload(file: UploadFile) -> UploadResponse:
+    """Upload your own PDF: rasterize -> store -> index. Then it's askable like any filing.
+
+    Idempotent on content (same bytes -> same synthetic accession -> re-upload is a no-op).
+    Serialized under the query lock: indexing shares the retriever's embedded-Qdrant client.
+    """
+    from ..config import settings
+    from ..ingest.store import MetadataStore
+    from ..ingest.upload import UploadError, ingest_upload, synthetic_accession
+
+    data = await file.read()
+    with _query_lock, span("upload", filename=file.filename, size=len(data)) as s:
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
+            if store.is_ingested(synthetic_accession(data)):
+                acc = synthetic_accession(data)
+                s["already_known"] = True
+                return UploadResponse(label="", accession=acc, pages=0, indexed=0,
+                                      already_known=True)
+            try:
+                filing, pages = ingest_upload(data, file.filename or "document.pdf",
+                                              store, Path(settings.data_dir))
+            except UploadError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            indexed = _get_retriever().index_pages(list(store.iter_pages_for(filing.accession)))
+            s["pages"] = len(pages)
+            s["indexed"] = indexed
+    return UploadResponse(label=filing.ticker, accession=filing.accession,
+                          pages=len(pages), indexed=indexed)
 
 
 @app.get("/pages/{accession}/{page_no}")

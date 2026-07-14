@@ -36,6 +36,13 @@ def test_no_mentions_yields_empty_filter():
     assert f.empty
 
 
+def test_uploaded_document_phrasing_targets_uploads():
+    # "uploaded annual report" must NOT trip the 10-K filter — that would exclude the upload.
+    f = parse_query_filters("What was total revenue in the uploaded annual report?")
+    assert f.form == "UPLOAD"
+    assert parse_query_filters("What does my document say about employees?").form == "UPLOAD"
+
+
 def test_word_boundaries_no_false_ticker_hits():
     # "commute" contains "mu"; "amdahl" contains "amd" — word boundaries must prevent both.
     f = parse_query_filters("Does the commute policy at Amdahl matter?")

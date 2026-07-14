@@ -83,6 +83,21 @@
   .ex.tricky .q-mark { color: var(--red); }
   .ex.tricky { color: var(--red); }
 
+  .upl { margin-top: 26px; }
+  .upl-drop {
+    display: block; width: 100%; text-align: center; cursor: pointer;
+    border: 1.5px dashed var(--rule); padding: 16px 12px; color: var(--ink-soft);
+    font-size: .82rem; background: none; font-family: var(--body); transition: border-color .15s, color .15s;
+  }
+  .upl-drop:hover { border-color: var(--green); color: var(--ink); }
+  .upl-drop b { font-family: var(--display); font-style: italic; color: var(--green); font-size: .95rem; display: block; margin-bottom: 2px; }
+  .upl-drop small { font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; color: var(--ink-mute); display: block; margin-top: 4px; }
+  .upl-status { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; margin-top: 8px; min-height: 1.2em; }
+  .upl-status.ok { color: var(--green); }
+  .upl-status.err { color: var(--red); }
+  .upl-status.busy { color: var(--ink-soft); animation: think 1.6s infinite; }
+  @keyframes think { 50% { opacity: .4; } }
+
   /* ---- main ---- */
   .main { display: flex; flex-direction: column; min-height: 0; }
   .askbar { padding: 20px 24px 14px; border-bottom: 1px solid var(--rule); background: var(--paper); }
@@ -210,6 +225,18 @@
       <button class="ex" data-q="What new process technology did Intel ramp into high-volume production in 2025?"><span class="q-mark">Q.</span>Intel’s new process node</button>
       <button class="ex tricky" data-q="What was Broadcom's total revenue in its most recent 10-K?"><span class="q-mark">✕</span>One it should refuse</button>
     </div>
+
+    <div class="upl">
+      <p class="side-h">Your documents</p>
+      <div id="uplList"></div>
+      <button class="upl-drop" id="uplBtn" type="button">
+        <b>+ Add a PDF</b>
+        annual report, filing, statement…
+        <small>PDF · up to 25 MB / 150 pages</small>
+      </button>
+      <input type="file" id="uplFile" accept="application/pdf,.pdf" hidden>
+      <p class="upl-status" id="uplStatus"></p>
+    </div>
   </aside>
 
   <div class="main">
@@ -321,6 +348,43 @@ f.addEventListener("submit", async (e) => {
 function esc(s) {
   return s.replace(/[&<>"']/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m]));
 }
+
+/* ---- upload your own document ---- */
+const uplBtn = document.getElementById("uplBtn"), uplFile = document.getElementById("uplFile"),
+      uplStatus = document.getElementById("uplStatus"), uplList = document.getElementById("uplList");
+
+uplBtn.addEventListener("click", () => uplFile.click());
+uplFile.addEventListener("change", async () => {
+  const file = uplFile.files[0];
+  if (!file) return;
+  uplStatus.className = "upl-status busy";
+  uplStatus.textContent = "READING PAGES + INDEXING…";
+  uplBtn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
+    if (d.already_known) {
+      uplStatus.className = "upl-status ok";
+      uplStatus.textContent = "✓ ALREADY ON FILE — ASK AWAY";
+    } else {
+      uplStatus.className = "upl-status ok";
+      uplStatus.textContent = `✓ ${d.pages} PAGES ON FILE — ASK AWAY`;
+      uplList.insertAdjacentHTML("beforeend",
+        `<div class="irow"><b>${esc(d.label)}</b><span class="dots"></span><span>${d.pages} pp · uploaded</span></div>`);
+      q.value = `In the uploaded document ${d.label}, `;
+      q.focus();
+    }
+  } catch (err) {
+    uplStatus.className = "upl-status err";
+    uplStatus.textContent = "✕ " + esc(String(err.message || err));
+  } finally {
+    uplBtn.disabled = false;
+    uplFile.value = "";
+  }
+});
 
 const root = document.documentElement, btn = document.getElementById("themeBtn");
 const cur = () => root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");

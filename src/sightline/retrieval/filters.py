@@ -30,6 +30,10 @@ _TICKER_ALIASES: dict[str, tuple[str, ...]] = {
 
 _FORM_10K = re.compile(r"\b10-?k\b|annual report", re.IGNORECASE)
 _FORM_10Q = re.compile(r"\b10-?q\b|quarterly (filing|report)", re.IGNORECASE)
+# User-uploaded documents (form="UPLOAD"). Must take precedence: "the uploaded annual report"
+# would otherwise trip the 10-K filter and EXCLUDE the very document being asked about.
+_FORM_UPLOAD = re.compile(r"\bupload(ed)?\b|\bmy (document|report|file|pdf)\b|\battached\b",
+                          re.IGNORECASE)
 
 
 @dataclass
@@ -49,10 +53,13 @@ def parse_query_filters(question: str) -> QueryFilters:
         if any(re.search(rf"\b{re.escape(a)}\b", q) for a in aliases)
     ]
     form: str | None = None
-    # If both forms are mentioned, filtering on either would exclude needed pages -> no filter.
-    k, qq = bool(_FORM_10K.search(question)), bool(_FORM_10Q.search(question))
-    if k != qq:
-        form = "10-K" if k else "10-Q"
+    if _FORM_UPLOAD.search(question):
+        form = "UPLOAD"  # wins over 10-K/10-Q phrasing — see _FORM_UPLOAD comment
+    else:
+        # If both forms are mentioned, filtering on either would exclude needed pages -> no filter.
+        k, qq = bool(_FORM_10K.search(question)), bool(_FORM_10Q.search(question))
+        if k != qq:
+            form = "10-K" if k else "10-Q"
     return QueryFilters(tickers=tickers, form=form)
 
 

@@ -21,6 +21,8 @@ dependencies = [
     "anthropic>=0.30",
     # Image handling in the visual answer path (downscale page PNGs before sending).
     "pillow>=10.0",
+    # Multipart form parsing for the /upload endpoint.
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

@@ -170,6 +170,24 @@ class MetadataStore:
             filing_date=r["filing_date"],
         )
 
+    def iter_pages_for(self, accession: str) -> Iterator[StoredPage]:
+        """Pages of ONE filing, with provenance — what indexing an upload needs."""
+        cur = self._conn.execute(
+            """
+            SELECT p.accession, p.page_no, p.image_path, p.text,
+                   f.ticker, f.form, f.filing_date
+            FROM pages p JOIN filings f ON f.accession = p.accession
+            WHERE p.accession = ? ORDER BY p.page_no
+            """,
+            (accession,),
+        )
+        for r in cur:
+            yield StoredPage(
+                accession=r["accession"], page_no=r["page_no"],
+                image_path=Path(r["image_path"]), text=r["text"],
+                ticker=r["ticker"], form=r["form"], filing_date=r["filing_date"],
+            )
+
     def iter_pages(self) -> Iterator[StoredPage]:
         """Stream every page with its filing provenance — the input to indexing (M1/M2)."""
         cur = self._conn.execute(

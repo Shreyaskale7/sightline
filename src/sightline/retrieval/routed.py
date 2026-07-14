@@ -66,6 +66,14 @@ class RoutedRetriever:
             s["reranked_to"] = len(out)
         return out
 
+    def index_pages(self, pages: list) -> int:
+        """Index freshly ingested pages (e.g. an upload) into the chunked collection.
+
+        Lives on the routed retriever because embedded Qdrant allows ONE client per path —
+        any indexing at serving time must reuse this instance's client, never open its own.
+        """
+        return self._chunked.index(pages)
+
     def close(self) -> None:
         self._chunked.close()
         self._store.close()
