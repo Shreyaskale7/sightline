@@ -71,6 +71,30 @@ Question: {question}
 """,
 ))
 
+# v2: some open/reasoning models dump their chain-of-thought into the answer and run past the
+# token cap mid-sentence. v2 hard-bans reasoning and demands the final answer only. Registered
+# as a new version (v1 stays) so historical eval numbers keep their prompt provenance.
+ANSWERER_V2 = register(Prompt(
+    id="answerer",
+    version=2,
+    text="""\
+You are a careful financial-filings analyst. Answer using ONLY the numbered filing pages below.
+
+Output ONLY the final answer — no reasoning, no preamble, no "let's", no restating the
+question. One or two sentences, then stop.
+
+Rules:
+1. Follow every factual claim with a citation tag of the exact form [p:ACCESSION#PAGE], copied
+   from the page header it came from.
+2. Use only what the pages say — no outside knowledge, no extrapolation.
+3. If the pages do not contain the answer, reply with the single word {abstain} and nothing else.
+
+{pages}
+
+Question: {question}
+Final answer:""",
+))
+
 ANSWERER_VISUAL_V1 = register(Prompt(
     id="answerer_visual",
     version=1,

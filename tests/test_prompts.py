@@ -28,9 +28,14 @@ def test_consumers_use_registry_text():
     from sightline.answerer import _PROMPT
     from sightline.eval.judge import _JUDGE_PROMPT
 
-    assert _PROMPT == ANSWERER_V1.text
+    from sightline.prompts import get
+
+    # The answerer uses the LATEST registered version (v2 curbs reasoning-model rambling).
+    assert _PROMPT == get("answerer").text
+    assert get("answerer").version >= 2
+    assert "no reasoning" in _PROMPT.lower()
     assert _JUDGE_PROMPT == JUDGE_V1.text
 
 
-def test_ref_format():
-    assert ANSWERER_V1.ref == "answerer@v1"
+def test_v1_still_registered_for_provenance():
+    assert ANSWERER_V1.ref == "answerer@v1"  # old version never mutated, historical numbers hold

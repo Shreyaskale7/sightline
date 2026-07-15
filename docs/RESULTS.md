@@ -24,6 +24,28 @@ are in this number.) Answers by `nvidia/nemotron-3-super-120b-a12b:free`; correc
 deterministic numeric match + `nemotron-nano-9b` judge (whose trust is quantifiable via Cohen's
 κ — see calibration.py). All 5 deliberately-unanswerable questions were correctly refused.
 
+## Judge calibration (Cohen's κ) — why the number isn't published (2026-07-15)
+
+The plan calls for calibrating the LLM-as-judge against human labels and reporting Cohen's κ.
+The harness is built and tested (`eval/calibration.py`), but running it against this benchmark
+produced only **3 judge-graded rows** — too few to compute a credible κ (one flip swings it
+wildly). This is by design, not a gap:
+
+- Most golden answers are **figures** ($215,938M, 42,000 employees, …), graded by an exact
+  deterministic `numeric_match` — no model opinion involved, so no κ needed. That's the *more*
+  trustworthy grader, and it covers the majority of cases.
+- Only free-text (prose) answers fall through to the LLM judge — a small slice of a
+  numeric-heavy exam.
+
+Publishing κ on n=3 would be less honest than saying this plainly: **the judge covers a
+minority of cases, and the majority is graded deterministically.** A meaningful κ would require
+deliberately adding ~10+ qualitative questions to enlarge the prose slice — logged as future
+work rather than faked now. The harness stands ready for that day.
+
+The same export surfaced (and hardened against) two free-model failure modes — null `content`
+responses and mid-sentence truncation from a reasoning model dumping its chain-of-thought; the
+answerer prompt is now v2 (reasoning suppressed) and the client coerces null → abstain.
+
 ## M4 — the money-shot (2026-07-10)
 
 The point of the two-stage retrieve (cheap text prefilter → VLM reads only the top-k) is cost.

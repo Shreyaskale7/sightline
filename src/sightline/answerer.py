@@ -29,7 +29,7 @@ from typing import Any, Protocol, Sequence
 
 from .config import settings
 # Prompts live in the registry (prompts.py) so eval numbers pin to a prompt version.
-from .prompts import ANSWERER_V1, ANSWERER_VISUAL_V1
+from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1
 from .observability import span
 
 # The model must tag claims like: [p:0001045810-26-000021#51]
@@ -40,7 +40,7 @@ _ABSTAIN_TOKEN = "ABSTAIN"
 # guards against pathological pages blowing up cost. (Cost discipline is a hard constraint.)
 _MAX_PAGE_CHARS = 6000
 
-_PROMPT = ANSWERER_V1.text
+_PROMPT = ANSWERER_V2.text
 _VISUAL_INSTRUCTIONS = ANSWERER_VISUAL_V1.text
 
 _MAX_IMAGE_WIDTH = 1024  # downscale before sending: filings stay legible, tokens stay sane
