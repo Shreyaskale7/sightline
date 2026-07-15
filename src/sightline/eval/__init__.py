@@ -1,8 +1,8 @@
 """Evaluation harness — the heart of the project.
 
-Build this in Milestone 1, before any visual retrieval. It is what lets you PROVE that
-every later change helped, instead of saying "it feels better." In interviews this is the
-part that signals you can do AI engineering rather than just call an API.
+Built before any visual retrieval. It is what lets every later change be PROVEN to help with a
+number on the benchmark, instead of relying on "it feels better." Retrieval quality is treated
+as a measured quantity, not an assumption.
 
 Metrics we care about:
   Retrieval:  Recall@k, nDCG@10, MRR   (did we find the right page?)

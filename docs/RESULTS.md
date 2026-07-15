@@ -1,7 +1,7 @@
 # Results
 
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
-later retrieval config (M2 visual/hybrid) must beat — see the prime directive in `CLAUDE.md`.
+later retrieval config (M2 visual/hybrid) must beat — measure the baseline before optimizing.
 
 ## Generation scorecard on the champion retrieval (2026-07-13)
 
@@ -129,7 +129,7 @@ of every design choice.
 | cross_company | 4 | 0.25 | 0.375 | 0.125 | **0.375** |
 | multi_hop | 3 | 0.11 | 0.111 | 0.333 | **0.333** |
 
-### The five findings (this is the portfolio)
+### The five findings
 1. **The cross-encoder reranker is the single biggest lever**: dense 0.316 → dense+filter+rerank
    0.551 (**+74%**). Reading (query, page-text) as one input beats any bi-encoder similarity.
 2. **Visual retrieval underperformed — and it was measured, not assumed.** ColModernVBERT (the
@@ -299,7 +299,7 @@ Over the 14 answerable cases attempted (9 answered, 5 abstained):
   scorecard costs roughly $0.50/run. Budget accordingly (M4 makes this a dashboard).
 
 ### Pivot to a $0 model stack (same day)
-Student budget → switched to OpenRouter's free models: answers by
+Switched to OpenRouter's free models: answers by
 `nvidia/nemotron-3-super-120b-a12b:free`, judge `nvidia/nemotron-nano-9b-v2:free`
 (and `nemotron-nano-12b-v2-vl:free` earmarked for the M2 vision path). Free tiers cap
 *requests/day* (~50), so two efficiency pieces were pulled forward from M4, both tested:

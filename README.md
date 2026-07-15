@@ -11,8 +11,8 @@ and returns answers with page-level citations — or honestly abstains when the 
 > VLM. Every number is reproducible (`docs/RESULTS.md`) — including a benched BM25 row and a
 > visual retriever that was *measured out* of the champion config rather than assumed in.
 
-> New here? Read `docs/DESIGN_DOC.md` (the what/why) and `docs/IMPLEMENTATION_PLAN.md` (the how).
-> If you're using Claude Code, `CLAUDE.md` has the full context and build order.
+> New here? [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the system design;
+> [`docs/RESULTS.md`](docs/RESULTS.md) is the measured results and ablation table.
 
 ## Why this exists
 Financial filings are visually dense — nested tables, footnotes, charts. OCR-and-chunk pipelines
@@ -42,17 +42,18 @@ flowchart LR
 Retrieval config is chosen **per question type** (the router doubles as a quality optimizer);
 the answer never ships unless the verifier confirms every claim is cited, else it abstains.
 
-## Status — M1–M4 done, M5 all but deploy/Loom
-| Milestone | State |
-|---|---|
-| M0 Scaffold · M1 Baseline+eval | ✅ done |
-| M2 Visual + hybrid retrieval | ✅ 13-config ablation; **champion Recall@5 0.603 (+91%)** |
-| M3 Agents + grounding | router · verifier · decomposition · config-routing ✅; Cohen's κ harness built (needs human labels) |
-| M4 LLMOps | money-shot (99.5% cheaper) · CI eval gate · rendered trace · prompt registry · cache ✅ |
-| M5 Serving + UI | landing + console · region highlighting · load-once serving · Dockerfile ✅; deploy + Loom pending |
+## What's implemented
+- **Retrieval** — dense (BGE) + chunking + metadata filtering + cross-encoder reranking, fused
+  and routed per question type; BM25 and late-interaction visual retrieval implemented and
+  measured. Full 13-configuration ablation → **champion Recall@5 0.603**.
+- **Generation** — grounded answers with page-level citations, a deterministic verifier that
+  forces abstention on unsupported claims, and honest refusal on unanswerable questions.
+- **Evaluation** — a 44-case hand-verified benchmark (retrieval + generation metrics), an
+  LLM-as-judge with a deterministic numeric fallback, and a CI regression gate.
+- **Serving** — FastAPI console + landing page, inline cited page images with region
+  highlighting, a rendered per-request trace, response caching, upload-your-own-PDF, Dockerfile.
 
-Corpus: 20 SEC filings / 1,329 page images (NVDA/AMD/INTC/MU/QCOM). 44-case hand-verified
-benchmark. All on **free/CPU models** (total build spend: $0.22). Full numbers, the ablation
+Corpus: 20 SEC filings / 1,329 page images (NVDA/AMD/INTC/MU/QCOM). Full numbers, the ablation
 table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Quickstart
@@ -86,17 +87,18 @@ make eval
 src/sightline/
   config.py          # settings (pydantic-settings, reads .env)
   observability.py   # tracing helper (Langfuse if configured, else no-op)
-  ingest/            # EDGAR client + PDF→image rasterization
-  retrieval/         # text baseline now; visual + hybrid later
-  agents/            # LangGraph router/planner/answerer/verifier (M3)
+  ingest/            # EDGAR client + PDF→image rasterization + uploads
+  retrieval/         # dense, bm25, visual, fusion, rerank, routing
+  agents/            # deterministic query router
   eval/              # eval harness + golden set
   api/               # FastAPI app
 scripts/             # CLI entry points
 tests/               # pytest
-docs/                # design doc + implementation plan
-.github/workflows/   # CI eval gate
+docs/                # architecture + measured results
+.github/workflows/   # CI (tests, lint, eval regression gate)
 ```
 
-## The one rule
-Measure the baseline before you build anything clever. That discipline is what turns this from a
-student project into a system you designed and evaluated.
+## Design principle
+Measure the baseline before adding anything clever, and prove every improvement with a number on
+the benchmark. Techniques that don't earn their place get benched — and the benched results are
+published alongside the wins.

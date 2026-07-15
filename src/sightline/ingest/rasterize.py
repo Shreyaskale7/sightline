@@ -13,12 +13,12 @@ Flow:
   3. The extracted text is ONLY for the BM25/dense prefilter side of hybrid retrieval, never
      for the final answer (the answer path reads page images).
 
-Dependency notes (see CLAUDE.md "explain any new heavy dependency"):
+Dependency notes:
   - Playwright (headless Chromium) is the heavy one. It is the most faithful renderer for the
     multi-column tables in filings and ships its own browser, so there is no fragile system
     dependency on Windows. weasyprint would need GTK native libs; wkhtmltopdf is deprecated.
   - PyMuPDF replaces the plan's pdf2image+poppler: pure pip install, does raster AND text in
-    one pass. (License: PyMuPDF is AGPL -- fine for a personal/portfolio project.)
+    one pass. (License: PyMuPDF is AGPL.)
 
 Imports of the heavy deps are deferred into the functions that need them, so importing this
 module (and unit-testing the metadata store) works even before the browser is installed.

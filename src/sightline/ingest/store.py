@@ -5,7 +5,7 @@ is small, relational, and needs *idempotent* upserts. `sqlite3` is in the stdlib
 dependency — and is plenty for a v1 corpus of a few thousand pages. Graduate to Postgres only
 if the corpus outgrows a single file.
 
-Idempotency is a hard constraint (see CLAUDE.md): re-running ingestion must never duplicate a
+Idempotency is a hard constraint: re-running ingestion must never duplicate a
 filing. We key filings on the SEC `accession` number (PRIMARY KEY) and pages on
 (accession, page_no), and re-ingesting a filing replaces its rows transactionally rather than
 appending. The image files on disk are likewise overwritten in place, keyed by the same ids.

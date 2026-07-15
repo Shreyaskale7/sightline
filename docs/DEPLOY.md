@@ -28,18 +28,17 @@ on free tiers.
 
 Same Dockerfile. Set the env vars in the dashboard, attach a disk for `data/`, done.
 
-## Option C — just a Loom over localhost (zero setup)
+## Option C — run it locally (zero setup)
 
-For the portfolio, a 3-minute Loom of `uvicorn sightline.api.main:app` running locally is
-nearly as persuasive as a live URL, and there's nothing to babysit. Record: landing page →
-console → a basic question (show the highlighted citation) → the comparison question → the
-question it refuses → the trace strip.
+`uvicorn sightline.api.main:app` serves the whole app at `http://localhost:8000` with nothing
+to babysit — useful for a quick demo: landing page → console → a basic question (show the
+highlighted citation) → the comparison question → the question it refuses → the trace strip.
 
 ## Notes
 
 - Free-tier CPU boxes are slower than your laptop: expect ~10–20 s per query (model load is
   amortized by the startup warmup; the response cache makes repeated demo questions instant).
 - The LLM key's free-tier daily quota (~50 requests) is the real limit for a public demo —
-  fine for interviews, not for Reddit. The cache absorbs repeat questions.
+  fine for a small audience, not for high traffic. The cache absorbs repeat questions.
 - Budget guardrail: the stack points at free models; if you ever switch `LLM_MODEL` to a paid
   one, set a hard spending cap with the provider first.

@@ -11,8 +11,8 @@ the OpenAI-compatible wire format behind it when `LLM_BASE_URL` is set. Callers 
 the difference, and unit tests keep injecting simple fakes of the same shape.
 
 Every client is wrapped in an exact-match RESPONSE CACHE (SQLite, keyed on a hash of
-model+params+messages). Why: on a student budget the daily request quota IS the budget —
-free tiers allow ~50 requests/day. With the cache, repeating an eval run only pays for
+model+params+messages). Why: on a free tier the daily request quota IS the budget —
+typically ~50 requests/day. With the cache, repeating an eval run only pays for
 cases it hasn't seen, so a quota-interrupted run finishes for free the next day, and
 "run the eval again" after a code refactor costs zero requests. (Semantic caching — matching
 *similar* prompts — arrives in M4; exact-match is the safe, obviously-correct version.)

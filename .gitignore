@@ -9,3 +9,9 @@ data/
 .DS_Store
 labels.csv
 data/llm_cache.db
+
+# Internal build/context docs — not part of the published product
+CLAUDE.md
+docs/LEARNING.md
+docs/IMPLEMENTATION_PLAN.md
+docs/DESIGN_DOC.md

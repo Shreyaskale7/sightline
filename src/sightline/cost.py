@@ -1,10 +1,10 @@
 """Cost accounting + the money-shot metric.
 
-Sightline runs on free models, so its real bill is ~$0. But the *architecture* is what a
-hiring manager buys: the two-stage retrieve (cheap text prefilter narrows 1,329 pages to the
-top ~5, then the VLM reads only those) is what makes visual QA affordable at all. This module
-quantifies that — "our design costs $X/query; naive send-every-page-to-a-VLM costs $Y — a Z%
-reduction" — using published prices for a reference PAID model, applied to real token counts.
+Sightline runs on free models, so its real bill is ~$0. The point of this module is to quantify
+the *architecture's* saving: the two-stage retrieve (cheap text prefilter narrows 1,329 pages to
+the top ~5, then the VLM reads only those) is what makes visual QA affordable at all. It reports
+"our design costs $X/query; naive send-every-page-to-a-VLM costs $Y — a Z% reduction" using
+published prices for a reference PAID model, applied to real token counts.
 
 Two uses:
   - estimate_cost(): score any actual LLM call from its usage dict (spans already capture it).
