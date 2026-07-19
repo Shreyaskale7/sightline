@@ -24,6 +24,40 @@ are in this number.) Answers by `nvidia/nemotron-3-super-120b-a12b:free`; correc
 deterministic numeric match + `nemotron-nano-9b` judge (whose trust is quantifiable via Cohen's
 κ — see calibration.py). All 5 deliberately-unanswerable questions were correctly refused.
 
+## Scale test: 3× the companies, identical champion score (2026-07-20)
+
+The strongest result here. Corpus expanded from **5 companies / 20 filings / 1,329 pages** to
+**15 companies / 32 filings / 2,353 pages** (10 more semiconductor issuers: TXN, ADI, AMAT, LRCX,
+KLAC, NXPI, ON, MRVL, MCHP, SWKS). The benchmark was left untouched, so every added company is
+pure *distractor* — more near-identical financial pages competing with the right one.
+
+| Config (same 44-case benchmark) | 5 companies | **15 companies** |
+|---|---:|---:|
+| Dense, unfiltered | 0.316 | **0.325** |
+| **Routed champion** (filter + chunk + decompose + rerank) | 0.603 | **0.603** |
+
+Per-slice, the champion is *identical* at both scales: basic 0.656, cross_company 0.375,
+multi_hop 0.333.
+
+### Why this matters
+Earlier, corpus growth was catastrophic: going from 10-Ks only to 10-Ks + 10-Qs collapsed dense
+retrieval **0.567 → 0.313**, because near-duplicate statement pages became distractors. That
+failure is what motivated metadata filtering and routing.
+
+This run is the payoff. Tripling the company count moved the champion **not at all** — because
+the filter excludes non-mentioned companies *before* scoring, so distractors that can't be the
+answer never compete. The architecture converts corpus growth from a liability into a no-op.
+
+That is the concrete answer to *"why not just paste the documents into a chat model?"* — a
+context window degrades as you add documents ("lost in the middle"), and cost scales with every
+page you send. Here, going from 1,329 to 2,353 pages cost **zero** accuracy and **zero** extra
+per-query spend, because retrieval still reads only the top 5 pages. Scale is where a retrieval
+system separates from a chat window.
+
+**Caveat, stated honestly:** the benchmark questions all concern the original 5 companies, so
+this measures *robustness to distractors*, not accuracy on the new companies. Extending the
+golden set to the new issuers is the next step.
+
 ## Judge calibration (Cohen's κ) — why the number isn't published (2026-07-15)
 
 The plan calls for calibrating the LLM-as-judge against human labels and reporting Cohen's κ.

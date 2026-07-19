@@ -4,7 +4,7 @@ A visual-first document-intelligence system over SEC filings. It answers analyst
 about 10-Ks and 10-Qs by retrieving and reasoning over **page images** (OCR-free, layout-preserving)
 and returns answers with page-level citations — or honestly abstains when the corpus can't support one.
 
-> **The numbers** (44-case benchmark over 20 filings / 1,329 pages, all on free/CPU models):
+> **The numbers** (44-case benchmark over 15 companies / 32 filings / 2,353 pages, on free/CPU models):
 > retrieval **Recall@5 0.603** (a measured **+91%** over the dense baseline, via a router that
 > picks the best config per question type), generation **correctness 0.90 / abstention recall
 > 1.00**, at a two-stage-retrieve cost that is **99.5% cheaper** than sending every page to a
@@ -53,8 +53,10 @@ the answer never ships unless the verifier confirms every claim is cited, else i
 - **Serving** — FastAPI console + landing page, inline cited page images with region
   highlighting, a rendered per-request trace, response caching, upload-your-own-PDF, Dockerfile.
 
-Corpus: 20 SEC filings / 1,329 page images (NVDA/AMD/INTC/MU/QCOM). Full numbers, the ablation
-table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
+Corpus: **15 companies / 32 SEC filings / 2,353 page images**. Tripling the company count left
+the champion score *unchanged* (0.603 → 0.603) while unfiltered retrieval sat at 0.325 — the
+filter-and-route design makes corpus growth a no-op instead of a liability. Full numbers, the
+ablation table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Quickstart
 ```bash
