@@ -23,8 +23,11 @@ from .edgar import Filing
 from .rasterize import Page, build_pages
 from .store import MetadataStore
 
-MAX_BYTES = 25 * 1024 * 1024   # 25 MB
-MAX_PAGES = 150
+# Real annual reports run 200–400 pages, so the caps are sized for actual filings rather than
+# excerpts. Rasterizing + embedding 500 pages takes ~1–2 min of CPU; the caps exist to bound
+# that, not to be conservative.
+MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+MAX_PAGES = 500
 
 _TICKER_OK = re.compile(r"[^A-Z0-9]")
 
@@ -68,7 +71,10 @@ def ingest_upload(
     if not pdf_bytes:
         raise UploadError("The file is empty.")
     if len(pdf_bytes) > MAX_BYTES:
-        raise UploadError(f"File is {len(pdf_bytes) // (1024*1024)} MB — the limit is 25 MB.")
+        raise UploadError(
+            f"File is {len(pdf_bytes) // (1024*1024)} MB — the limit is "
+            f"{MAX_BYTES // (1024*1024)} MB."
+        )
     if not pdf_bytes.startswith(b"%PDF"):
         raise UploadError("Only PDF files are supported — this doesn't look like a PDF.")
 

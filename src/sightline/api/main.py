@@ -109,18 +109,28 @@ def console() -> str:
     return _APP_HTML.read_text(encoding="utf-8")
 
 
-class UploadResponse(BaseModel):
-    label: str
-    accession: str
-    pages: int
-    indexed: int
+class UploadedDoc(BaseModel):
+    filename: str
+    label: str = ""
+    accession: str = ""
+    pages: int = 0
+    indexed: int = 0
     already_known: bool = False
+    error: str = ""      # per-file: one bad PDF must not fail the whole batch
+
+
+class UploadResponse(BaseModel):
+    documents: list[UploadedDoc] = []
+    total_pages: int = 0
+    total_indexed: int = 0
 
 
 @app.post("/upload", response_model=UploadResponse)
-async def upload(file: UploadFile) -> UploadResponse:
-    """Upload your own PDF: rasterize -> store -> index. Then it's askable like any filing.
+async def upload(files: list[UploadFile]) -> UploadResponse:
+    """Upload one or more PDFs: rasterize -> store -> index. Then they're askable like any filing.
 
+    Accepts a batch so you can bring a whole set of reports, not one file at a time. Each file is
+    handled independently — a rejected PDF reports its own error and the rest still land.
     Idempotent on content (same bytes -> same synthetic accession -> re-upload is a no-op).
     Serialized under the query lock: indexing shares the retriever's embedded-Qdrant client.
     """
@@ -128,24 +138,39 @@ async def upload(file: UploadFile) -> UploadResponse:
     from ..ingest.store import MetadataStore
     from ..ingest.upload import UploadError, ingest_upload, synthetic_accession
 
-    data = await file.read()
-    with _query_lock, span("upload", filename=file.filename, size=len(data)) as s:
+    payloads = [(f.filename or "document.pdf", await f.read()) for f in files]
+    docs: list[UploadedDoc] = []
+
+    with _query_lock, span("upload", n_files=len(payloads)) as s:
         with MetadataStore(settings.data_dir / "sightline.db") as store:
-            if store.is_ingested(synthetic_accession(data)):
-                acc = synthetic_accession(data)
-                s["already_known"] = True
-                return UploadResponse(label="", accession=acc, pages=0, indexed=0,
-                                      already_known=True)
-            try:
-                filing, pages = ingest_upload(data, file.filename or "document.pdf",
-                                              store, Path(settings.data_dir))
-            except UploadError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
-            indexed = _get_retriever().index_pages(list(store.iter_pages_for(filing.accession)))
-            s["pages"] = len(pages)
-            s["indexed"] = indexed
-    return UploadResponse(label=filing.ticker, accession=filing.accession,
-                          pages=len(pages), indexed=indexed)
+            for filename, data in payloads:
+                try:
+                    acc = synthetic_accession(data) if data else ""
+                    if acc and store.is_ingested(acc):
+                        docs.append(UploadedDoc(filename=filename, accession=acc,
+                                                already_known=True))
+                        continue
+                    filing, pages = ingest_upload(data, filename, store,
+                                                  Path(settings.data_dir))
+                    indexed = _get_retriever().index_pages(
+                        list(store.iter_pages_for(filing.accession))
+                    )
+                    docs.append(UploadedDoc(
+                        filename=filename, label=filing.ticker, accession=filing.accession,
+                        pages=len(pages), indexed=indexed,
+                    ))
+                except UploadError as e:
+                    docs.append(UploadedDoc(filename=filename, error=str(e)))
+        s["accepted"] = sum(1 for d in docs if d.pages)
+        s["rejected"] = sum(1 for d in docs if d.error)
+
+    if docs and all(d.error for d in docs):  # nothing usable -> surface it as a client error
+        raise HTTPException(status_code=400, detail=docs[0].error)
+    return UploadResponse(
+        documents=docs,
+        total_pages=sum(d.pages for d in docs),
+        total_indexed=sum(d.indexed for d in docs),
+    )
 
 
 @app.get("/pages/{accession}/{page_no}")

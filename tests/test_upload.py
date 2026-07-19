@@ -48,7 +48,7 @@ def test_guardrails():
         ingest_upload(b"", "x.pdf", None, None)
     with pytest.raises(UploadError, match="look like a PDF"):
         ingest_upload(b"MZplainly-not-pdf", "x.pdf", None, None)
-    with pytest.raises(UploadError, match="limit is 25"):
+    with pytest.raises(UploadError, match="limit is 100 MB"):
         ingest_upload(b"%PDF" + b"0" * (MAX_BYTES + 1), "x.pdf", None, None)
 
 
@@ -82,19 +82,49 @@ def test_upload_endpoint_flow(tmp_path, monkeypatch):
     client = TestClient(api_main.app)
 
     pdf = _tiny_pdf()
-    r = client.post("/upload", files={"file": ("report.pdf", pdf, "application/pdf")})
+    r = client.post("/upload", files=[("files", ("report.pdf", pdf, "application/pdf"))])
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["pages"] == 1 and d["indexed"] == 1 and d["label"] == "REPORT"
+    doc = d["documents"][0]
+    assert doc["pages"] == 1 and doc["indexed"] == 1 and doc["label"] == "REPORT"
+    assert d["total_pages"] == 1 and d["total_indexed"] == 1
 
     # same bytes again -> idempotent no-op
-    r2 = client.post("/upload", files={"file": ("report.pdf", pdf, "application/pdf")})
-    assert r2.json()["already_known"] is True
+    r2 = client.post("/upload", files=[("files", ("report.pdf", pdf, "application/pdf"))])
+    assert r2.json()["documents"][0]["already_known"] is True
 
     # the uploaded page image is servable for the exhibit view
-    img = client.get(f"/pages/{d['accession']}/1")
+    img = client.get(f"/pages/{doc['accession']}/1")
     assert img.status_code == 200 and img.content[:4] == b"\x89PNG"
 
     # a non-PDF is refused with a clear message
-    bad = client.post("/upload", files={"file": ("x.pdf", b"not a pdf", "application/pdf")})
+    bad = client.post("/upload", files=[("files", ("x.pdf", b"not a pdf", "application/pdf"))])
     assert bad.status_code == 400 and "PDF" in bad.json()["detail"]
+
+
+def test_upload_batch_partial_failure(tmp_path, monkeypatch):
+    """A batch with one bad file still indexes the good ones — per-file errors, not all-or-nothing."""
+    from fastapi.testclient import TestClient
+
+    from sightline.api import main as api_main
+    from sightline.config import settings
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+
+    class _FakeRetriever:
+        def index_pages(self, pages):
+            return len(list(pages))
+
+    monkeypatch.setattr(api_main, "_get_retriever", lambda: _FakeRetriever())
+    client = TestClient(api_main.app)
+
+    r = client.post("/upload", files=[
+        ("files", ("good_a.pdf", _tiny_pdf("Revenue $1,111"), "application/pdf")),
+        ("files", ("broken.pdf", b"definitely not a pdf", "application/pdf")),
+        ("files", ("good_b.pdf", _tiny_pdf("Revenue $2,222"), "application/pdf")),
+    ])
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["total_pages"] == 2 and d["total_indexed"] == 2   # both good files landed
+    errs = [x for x in d["documents"] if x["error"]]
+    assert len(errs) == 1 and errs[0]["filename"] == "broken.pdf"

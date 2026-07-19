@@ -230,11 +230,11 @@
       <p class="side-h">Your documents</p>
       <div id="uplList"></div>
       <button class="upl-drop" id="uplBtn" type="button">
-        <b>+ Add a PDF</b>
-        annual report, filing, statement…
-        <small>PDF · up to 25 MB / 150 pages</small>
+        <b>+ Add PDFs</b>
+        annual reports, filings, statements — select several at once
+        <small>PDF · up to 100 MB / 500 pages each</small>
       </button>
-      <input type="file" id="uplFile" accept="application/pdf,.pdf" hidden>
+      <input type="file" id="uplFile" accept="application/pdf,.pdf" multiple hidden>
       <p class="upl-status" id="uplStatus"></p>
     </div>
   </aside>
@@ -355,28 +355,42 @@ const uplBtn = document.getElementById("uplBtn"), uplFile = document.getElementB
 
 uplBtn.addEventListener("click", () => uplFile.click());
 uplFile.addEventListener("change", async () => {
-  const file = uplFile.files[0];
-  if (!file) return;
+  const files = Array.from(uplFile.files || []);
+  if (!files.length) return;
   uplStatus.className = "upl-status busy";
-  uplStatus.textContent = "READING PAGES + INDEXING…";
+  uplStatus.textContent = files.length === 1
+    ? "READING PAGES + INDEXING…"
+    : `READING ${files.length} DOCUMENTS + INDEXING…`;
   uplBtn.disabled = true;
   try {
     const fd = new FormData();
-    fd.append("file", file);
+    files.forEach(f => fd.append("files", f));
     const r = await fetch("/upload", { method: "POST", body: fd });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-    if (d.already_known) {
-      uplStatus.className = "upl-status ok";
-      uplStatus.textContent = "✓ ALREADY ON FILE — ASK AWAY";
-    } else {
-      uplStatus.className = "upl-status ok";
-      uplStatus.textContent = `✓ ${d.pages} PAGES ON FILE — ASK AWAY`;
-      uplList.insertAdjacentHTML("beforeend",
-        `<div class="irow"><b>${esc(d.label)}</b><span class="dots"></span><span>${d.pages} pp · uploaded</span></div>`);
-      q.value = `In the uploaded document ${d.label}, `;
-      q.focus();
-    }
+
+    let firstLabel = "";
+    (d.documents || []).forEach(doc => {
+      if (doc.error) {
+        uplList.insertAdjacentHTML("beforeend",
+          `<div class="irow"><b>${esc(doc.filename)}</b><span class="dots"></span><span style="color:var(--red)">${esc(doc.error)}</span></div>`);
+      } else if (doc.already_known) {
+        uplList.insertAdjacentHTML("beforeend",
+          `<div class="irow"><b>${esc(doc.filename)}</b><span class="dots"></span><span>already on file</span></div>`);
+      } else {
+        firstLabel = firstLabel || doc.label;
+        uplList.insertAdjacentHTML("beforeend",
+          `<div class="irow"><b>${esc(doc.label)}</b><span class="dots"></span><span>${doc.pages} pp · uploaded</span></div>`);
+      }
+    });
+
+    const ok = (d.documents || []).filter(x => x.pages).length;
+    const bad = (d.documents || []).filter(x => x.error).length;
+    uplStatus.className = bad && !ok ? "upl-status err" : "upl-status ok";
+    uplStatus.textContent = ok
+      ? `✓ ${ok} DOCUMENT${ok === 1 ? "" : "S"} · ${d.total_pages} PAGES ON FILE — ASK AWAY${bad ? ` (${bad} REJECTED)` : ""}`
+      : `✕ NOTHING INDEXED (${bad} REJECTED)`;
+    if (firstLabel) { q.value = `In the uploaded document ${firstLabel}, `; q.focus(); }
   } catch (err) {
     uplStatus.className = "upl-status err";
     uplStatus.textContent = "✕ " + esc(String(err.message || err));
