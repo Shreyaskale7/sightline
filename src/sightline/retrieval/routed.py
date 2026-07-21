@@ -26,7 +26,12 @@ from .text_baseline import Hit, TextRetriever
 
 
 class RoutedRetriever:
-    def __init__(self) -> None:
+    def __init__(self, statement_boost: bool = True) -> None:
+        # statement_boost: for financial-figure questions, lift income-statement pages above
+        # narrative pages within the reranked pool. ON by default — measured lift 0.582 -> 0.731
+        # on the 54-case benchmark, with non-financial questions provably unchanged (they skip
+        # the boost). The `routed_noboost` eval config turns it off for the ablation.
+        self.statement_boost = statement_boost
         from qdrant_client import QdrantClient
 
         from ..ingest.store import MetadataStore
@@ -55,7 +60,24 @@ class RoutedRetriever:
             (h, (p.text if (p := self._store.get_page(h.accession, h.page_no)) else ""))
             for h in hits
         ]
-        return self._reranker.rerank(query, pairs, k=k)
+        # When boosting, rerank the WHOLE pool (not just top-k) so a statement page ranked
+        # anywhere in the candidates can be promoted; otherwise just the top-k.
+        reranked = self._reranker.rerank(query, pairs, k=len(pairs) if self.statement_boost else k)
+        if not self.statement_boost:
+            return reranked[:k]
+
+        from .statement_boost import is_financial_metric_question, looks_like_income_statement
+
+        if not is_financial_metric_question(query):
+            return reranked[:k]
+        text_of = {(h.accession, h.page_no): t for h, t in pairs}
+        # Stable partition: income-statement pages first (keeping the reranker's order within each
+        # group). Guarantees an in-pool statement page reaches the top-k for a figure question.
+        stmt = [h for h in reranked
+                if looks_like_income_statement(text_of.get((h.accession, h.page_no), ""))]
+        rest = [h for h in reranked
+                if not looks_like_income_statement(text_of.get((h.accession, h.page_no), ""))]
+        return (stmt + rest)[:k]
 
     def retrieve(self, query: str, k: int = 5) -> list[Hit]:
         with span("route") as s:

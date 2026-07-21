@@ -1,7 +1,7 @@
 {
   "retriever": "routed",
   "n": 49,
-  "recall@5": 0.582,
-  "ndcg@10": 0.481,
-  "mrr": 0.425
+  "recall@5": 0.731,
+  "ndcg@10": 0.658,
+  "mrr": 0.631
 }

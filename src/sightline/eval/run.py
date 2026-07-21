@@ -84,11 +84,12 @@ def _make_retrieve_fn(name: str):
 
         return fn_dr, cleanup_dr
 
-    if name == "routed":
-        # Config-routing: comparison -> decomposition (no rerank), else grand (rerank).
+    if name in ("routed", "routed_noboost"):
+        # Champion: config-routing (comparison -> decomposition; else rerank) + income-statement
+        # preference for financial-figure questions. `routed_noboost` is the ablation without it.
         from sightline.retrieval.routed import RoutedRetriever
 
-        rr = RoutedRetriever()
+        rr = RoutedRetriever(statement_boost=(name == "routed"))
         return rr.retrieve, rr.close
 
     if name == "grand":

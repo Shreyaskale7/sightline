@@ -33,6 +33,7 @@ class _FakeReranker:
 
 def _routed() -> tuple[RoutedRetriever, _FakeReranker]:
     r = object.__new__(RoutedRetriever)  # bypass heavy __init__
+    r.statement_boost = False            # these tests exercise the routing/rerank branch logic
     r._chunked = _FakeChunked()
     r._store = _FakeStore()
     r._reranker = _FakeReranker()

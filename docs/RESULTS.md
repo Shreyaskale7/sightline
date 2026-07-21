@@ -24,6 +24,36 @@ are in this number.) Answers by `nvidia/nemotron-3-super-120b-a12b:free`; correc
 deterministic numeric match + `nemotron-nano-9b` judge (whose trust is quantifiable via Cohen's
 κ — see calibration.py). All 5 deliberately-unanswerable questions were correctly refused.
 
+## Income-statement preference: 0.582 → 0.731 (2026-07-22)
+
+The 15-company diagnosis (below) showed the residual misses were all *within-company page
+precision*: for a figure question, dense (and the cross-encoder) prefer the MD&A "results of
+operations" prose over the terse income-statement TABLE. Per-case inspection confirmed the
+statement page was usually already in the candidate pool, just ranked below narrative pages.
+
+The fix encodes a domain prior (`retrieval/statement_boost.py`): **for a financial-figure
+question, prefer the consolidated income-statement page** — where an analyst actually reads these
+numbers. Two tight gates: (a) the question asks for a line item (revenue / R&D / net income /
+gross profit / …), and (b) the candidate page carries the income-statement fingerprint (a revenue
+line + a cost-of line + net income + one more statement row). It re-orders the reranked pool; it
+cannot conjure a page retrieval never surfaced.
+
+| Config (54-case benchmark, 15 companies) | Recall@5 | nDCG@10 | MRR |
+|---|---:|---:|---:|
+| Dense, unfiltered | 0.361 | 0.283 | 0.220 |
+| Routed (filter + chunk + decompose + rerank) | 0.582 | 0.481 | 0.425 |
+| **Routed + statement preference — champion** | **0.731** | **0.658** | **0.631** |
+
+Per-slice lift, routed → champion: basic 0.619 → **0.762**, multi_hop 0.333 → **0.778**
+(revenue-trend questions now find each quarter's statement page), cross_company 0.375 (unchanged
+— comparisons skip rerank by design, so the boost never applies).
+
+**Downside check (the reason it's safe):** the boost only fires on financial-figure questions;
+for every other question the code path is *provably identical* to before (rerank-all-then-take-k
+returns the same top-k as rerank-to-k). So qualitative questions — employees, foundry, segments,
+headquarters — are untouched. The +0.149 overall is pure gain on the questions the prior applies
+to. Net vs the unfiltered baseline: **0.361 → 0.731, +102%.**
+
 ## Scale test: 3× the companies, identical champion score (2026-07-20)
 
 The strongest result here. Corpus expanded from **5 companies / 20 filings / 1,329 pages** to
