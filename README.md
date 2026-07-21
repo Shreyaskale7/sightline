@@ -4,9 +4,9 @@ A visual-first document-intelligence system over SEC filings. It answers analyst
 about 10-Ks and 10-Qs by retrieving and reasoning over **page images** (OCR-free, layout-preserving)
 and returns answers with page-level citations — or honestly abstains when the corpus can't support one.
 
-> **The numbers** (44-case benchmark over 15 companies / 32 filings / 2,353 pages, on free/CPU models):
-> retrieval **Recall@5 0.603** (a measured **+91%** over the dense baseline, via a router that
-> picks the best config per question type), generation **correctness 0.90 / abstention recall
+> **The numbers** (54-case benchmark over 15 companies / 32 filings / 2,353 pages, on free/CPU models):
+> retrieval **Recall@5 0.582** on a benchmark spanning all 15 companies (**+79%** over the
+> dense baseline), via a router that picks the best config per question type, generation **correctness 0.90 / abstention recall
 > 1.00**, at a two-stage-retrieve cost that is **99.5% cheaper** than sending every page to a
 > VLM. Every number is reproducible (`docs/RESULTS.md`) — including a benched BM25 row and a
 > visual retriever that was *measured out* of the champion config rather than assumed in.
@@ -45,18 +45,20 @@ the answer never ships unless the verifier confirms every claim is cited, else i
 ## What's implemented
 - **Retrieval** — dense (BGE) + chunking + metadata filtering + cross-encoder reranking, fused
   and routed per question type; BM25 and late-interaction visual retrieval implemented and
-  measured. Full 13-configuration ablation → **champion Recall@5 0.603**.
+  measured. Full 13-configuration ablation → **champion Recall@5 0.582** across 15 companies.
 - **Generation** — grounded answers with page-level citations, a deterministic verifier that
   forces abstention on unsupported claims, and honest refusal on unanswerable questions.
-- **Evaluation** — a 44-case hand-verified benchmark (retrieval + generation metrics), an
+- **Evaluation** — a 54-case hand-verified benchmark (retrieval + generation metrics), an
   LLM-as-judge with a deterministic numeric fallback, and a CI regression gate.
 - **Serving** — FastAPI console + landing page, inline cited page images with region
   highlighting, a rendered per-request trace, response caching, upload-your-own-PDF, Dockerfile.
 
-Corpus: **15 companies / 32 SEC filings / 2,353 page images**. Tripling the company count left
-the champion score *unchanged* (0.603 → 0.603) while unfiltered retrieval sat at 0.325 — the
-filter-and-route design makes corpus growth a no-op instead of a liability. Full numbers, the
-ablation table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
+Corpus: **15 companies / 32 SEC filings / 2,353 page images**. Two scale results: running the
+*original* questions on the 3×-larger corpus left the champion **unchanged** (0.603, vs 0.325
+unfiltered) — corpus growth is a no-op because the filter drops non-mentioned companies before
+scoring; and on a benchmark **extended to all 15 companies** the champion is **0.582**, with the
+company routing perfect and the residual misses all within-company page precision. Full numbers,
+the ablation table, and reproduce commands: [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Quickstart
 ```bash

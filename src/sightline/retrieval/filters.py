@@ -19,13 +19,25 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-# Corpus companies: every alias is lowercase; word-boundary matched.
+# Corpus companies: every alias is lowercase; word-boundary matched. Avoid aliases that are
+# common English words — e.g. onsemi's ticker "ON" is deliberately NOT an alias (it would match
+# "on" in every sentence); its full names are used instead.
 _TICKER_ALIASES: dict[str, tuple[str, ...]] = {
     "NVDA": ("nvidia", "nvda"),
     "AMD": ("amd", "advanced micro devices"),
     "INTC": ("intel", "intc"),
     "MU": ("micron", "mu"),
     "QCOM": ("qualcomm", "qcom"),
+    "TXN": ("texas instruments", "txn"),
+    "ADI": ("analog devices", "adi"),
+    "AMAT": ("applied materials", "amat"),
+    "LRCX": ("lam research", "lrcx"),
+    "KLAC": ("kla", "klac"),
+    "NXPI": ("nxp semiconductors", "nxp", "nxpi"),
+    "ON": ("onsemi", "on semiconductor", "on semiconductors"),
+    "MRVL": ("marvell", "mrvl"),
+    "MCHP": ("microchip", "mchp"),
+    "SWKS": ("skyworks", "swks"),
 }
 
 _FORM_10K = re.compile(r"\b10-?k\b|annual report", re.IGNORECASE)

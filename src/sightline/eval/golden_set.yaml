@@ -449,6 +449,90 @@ cases:
     also_valid_pages:  # other pages stating the same fact (mined + verified); citation-grading only
       - { accession: "0000050863-26-000011", page_no: 33 }
 
+  # --- basic: expanded-corpus companies (batch 4) ---------------------------
+  # Verified in-page against each company's latest 10-K income statement.
+  # Note: ADI and LRCX report in THOUSANDS on the statement; gold answers give
+  # the billions figure a human would state.
+  - id: txn-revenue
+    question: "What was Texas Instruments' revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$17,682 million."
+    relevant_pages:
+      - { accession: "0000097476-26-000059", page_no: 28 }
+
+  - id: txn-rnd
+    question: "How much did Texas Instruments spend on research and development in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$2,083 million."
+    relevant_pages:
+      - { accession: "0000097476-26-000059", page_no: 28 }
+
+  - id: amat-revenue
+    question: "What was Applied Materials' net revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$28,368 million."
+    relevant_pages:
+      - { accession: "0001628280-25-056742", page_no: 48 }
+
+  - id: adi-revenue
+    question: "What was Analog Devices' revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "About $11.0 billion ($11,019,707 thousand)."
+    relevant_pages:
+      - { accession: "0000006281-25-000153", page_no: 47 }
+
+  - id: lrcx-revenue
+    question: "What was Lam Research's revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "About $18.4 billion ($18,435,591 thousand)."
+    relevant_pages:
+      - { accession: "0000707549-25-000075", page_no: 39 }   # consolidated statement of operations
+
+  - id: mrvl-revenue
+    question: "What was Marvell's net revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$8,194.6 million (about $8.2 billion)."
+    relevant_pages:
+      - { accession: "0001835632-26-000011", page_no: 59 }
+
+  - id: mchp-revenue
+    question: "What were Microchip's net sales in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$4,713.1 million."
+    relevant_pages:
+      - { accession: "0000827054-26-000016", page_no: 82 }
+
+  - id: nxpi-revenue
+    question: "What was NXP Semiconductors' revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$12,269 million (about $12.3 billion)."
+    relevant_pages:
+      - { accession: "0001413447-26-000008", page_no: 68 }
+
+  - id: onsemi-revenue
+    question: "What was onsemi's revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$5,995.4 million (down from $7,082.3 million)."
+    relevant_pages:
+      - { accession: "0001097864-26-000006", page_no: 38 }
+
+  - id: swks-revenue
+    question: "What was Skyworks' net revenue in its most recent 10-K?"
+    slice: basic
+    answerable: true
+    gold_answer: "$4,086.9 million."
+    relevant_pages:
+      - { accession: "0000004127-25-000085", page_no: 38 }
+
   # --- unanswerable: the system should ABSTAIN, not guess -------------------
   - id: unanswerable-ceo-salary-2005
     question: "What was NVIDIA's CEO's exact salary in 2005 according to these filings?"

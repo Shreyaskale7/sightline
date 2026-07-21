@@ -54,9 +54,34 @@ page you send. Here, going from 1,329 to 2,353 pages cost **zero** accuracy and 
 per-query spend, because retrieval still reads only the top 5 pages. Scale is where a retrieval
 system separates from a chat window.
 
-**Caveat, stated honestly:** the benchmark questions all concern the original 5 companies, so
-this measures *robustness to distractors*, not accuracy on the new companies. Extending the
-golden set to the new issuers is the next step.
+### Then the benchmark was extended to actually cover them (2026-07-20)
+
+The caveat above ("benchmark only tests the original 5") was then closed: **10 verified
+questions** were added across the new companies (TXN, ADI, AMAT, LRCX, MRVL, MCHP, NXPI, ON,
+SWKS), each grounded in that company's 10-K income statement, and the metadata filter learned
+their names. The benchmark is now **54 cases / 49 answerable, spanning all 15 companies**.
+
+| Benchmark | champion Recall@5 |
+|---|---:|
+| 44 cases, 5 companies | 0.603 |
+| **54 cases, 15 companies** | **0.582** |
+
+Per-slice: basic 0.619, cross_company 0.375, multi_hop 0.333.
+
+**Diagnosis (per-case, not guessed):** on the 10 new-company questions the metadata filter is
+*perfect* — every retrieved page is from the correct company. The misses are entirely
+*within-company page precision*: dense retrieval picks a nearby revenue-mentioning page (the
+MD&A "results of operations" page, or the adjacent page of a two-page statement) over the exact
+labelled statement page. This is the **same weakness measured throughout the project** — dense
+embeddings under-rank terse number-tables — now confirmed consistently across 10 companies it had
+never seen. (One case, LRCX, was a genuine labelling error on my part — p31 is the MD&A page, not
+the statement at p39 — and was corrected.)
+
+So the honest headline: the architecture **generalizes to unseen companies** (company routing is
+flawless), and the ceiling is the known within-company precision problem, whose fix is the same
+scoped path — a stronger reranker or GPU visual retrieval. The number is slightly lower than the
+5-company benchmark precisely because it's now a *harder, broader* test — which makes it the more
+credible one.
 
 ## Judge calibration (Cohen's κ) — why the number isn't published (2026-07-15)
 
