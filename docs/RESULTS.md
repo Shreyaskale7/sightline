@@ -3,6 +3,38 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — measure the baseline before optimizing.
 
+## Fusing the reranker with the dense rank: 0.731 → 0.752 (2026-07-24)
+
+Before optimizing retrieval further, I diagnosed *where* the misses come from — split each
+answerable case into "is the gold page in the top-20 pool?" (first-stage) vs "does it survive to
+the top-5?" (rerank-stage):
+
+| Stage | Recall |
+|---|--:|
+| pool (gold in top-20, pre-rerank) | 45/49 = **0.918** |
+| final (top-5, post-rerank) | 37/49 = 0.755 |
+
+So first-stage retrieval is strong — only **4** cases never retrieve the gold at all. The bigger
+loss was **8 rerank drops**: pages that *were* in the pool but the cross-encoder pushed below rank
+5. Five of the eight were employee-count questions, where the headcount is a single sentence deep
+in a long Item 1 page — past the reranker's head-only window (`_MAX_CHARS`) — even though the dense
+*chunk* retriever had found that exact sentence (that's why it was in the pool).
+
+The fix isn't a domain hack: **don't trust the cross-encoder outright — RRF-fuse its rank with the
+dense first-stage rank** (`routed.py::_fused_rerank`, standard k0=60). A strong dense hit then
+survives a mediocre cross-encoder score, and vice-versa.
+
+| Config | Recall@5 | nDCG@10 | MRR |
+|---|--:|--:|--:|
+| routed + statement preference | 0.731 | 0.658 | 0.631 |
+| **+ RRF(cross-encoder, dense) rerank** | **0.752** | 0.682 | 0.665 |
+
+Measured lift **+0.021** (rerank drops 8 → 7, basic slice 0.762 → 0.786), no regression on the
+comparison/multi-hop slices (they don't take the rerank path). k0 was kept at the textbook 60
+rather than tuned to 49 cases — tuning it here would overfit the test set. The remaining headroom
+is now clearly first-stage: 4 pool misses (`mrvl-revenue`, `onsemi-revenue`, `intc-employees`,
+`nvda-foundry`) whose gold page dense retrieval never surfaces — a separate, harder problem.
+
 ## Upload-path benchmark + OCR fallback: 0.667 → 1.000 on scanned docs (2026-07-23)
 
 Every other number here is on the SEC corpus, but the product's real use is *uploaded* user

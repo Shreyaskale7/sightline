@@ -76,10 +76,32 @@ class RoutedRetriever:
                     rest = [h for h, t in pairs if not looks_like_income_statement(t)]
                     return (stmt + rest)[:k]
                 # no statement page in the pool -> the reranker is needed to find the right page.
-            # non-financial (or no statement hit): rank the whole pool, then take top-k.
-            return self._reranker.rerank(query, pairs, k=len(pairs))[:k]
+            # non-financial (or no statement hit): fuse the cross-encoder with the dense rank.
+            return self._fused_rerank(query, pairs, k)
 
         return self._reranker.rerank(query, pairs, k=k)
+
+    def _fused_rerank(self, query: str, pairs: list[tuple[Hit, str]], k: int) -> list[Hit]:
+        """Reciprocal-Rank-Fusion of the cross-encoder rank and the dense first-stage rank.
+
+        Measured problem (diagnostic on the golden set): the cross-encoder alone dropped 8 gold
+        pages from the top-5 that WERE in the top-20 pool — mostly employee-count questions, where
+        the headcount is one sentence deep in a long Item 1 page that the reranker's head-only view
+        (_MAX_CHARS) misses, even though the dense chunk retriever found that exact sentence. So
+        don't trust the cross-encoder outright: RRF(rank) blends both, letting a strong dense hit
+        survive a mediocre cross-encoder score (and vice-versa). k0=60 is the standard RRF constant.
+        `pairs` arrives in dense-best-first order, so the list index IS the dense rank.
+        """
+        k0 = 60
+        ce_scores = self._reranker.score(query, [t for _, t in pairs])
+        ce_order = sorted(range(len(pairs)), key=lambda i: ce_scores[i], reverse=True)
+        ce_rank = {i: r for r, i in enumerate(ce_order)}  # candidate index -> cross-encoder rank
+        fused = sorted(
+            range(len(pairs)),
+            key=lambda i: 1.0 / (k0 + i) + 1.0 / (k0 + ce_rank[i]),  # i == dense rank
+            reverse=True,
+        )
+        return [pairs[i][0] for i in fused[:k]]
 
     def retrieve(
         self, query: str, k: int = 5, filter_override: "QueryFilters | None" = None

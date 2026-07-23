@@ -36,6 +36,24 @@ class Reranker:
 
             self._model = CrossEncoder(self.model_name)
 
+    def score(self, query: str, texts: Sequence[str]) -> list[float]:
+        """Cross-encoder relevance scores aligned to the input order (empty text -> -inf).
+
+        Exposes the raw scores (rather than a sorted list) so callers can FUSE the cross-encoder
+        signal with the dense first-stage rank instead of trusting it outright — the cross-encoder
+        reads only the page head (_MAX_CHARS) and sometimes demotes a page whose relevant sentence
+        the dense retriever found deeper in the page."""
+        if not texts:
+            return []
+        self._ensure()
+        idx = [i for i, t in enumerate(texts) if t.strip()]
+        out = [float("-inf")] * len(texts)
+        if idx:
+            preds = self._model.predict([(query, texts[i][:_MAX_CHARS]) for i in idx])
+            for i, s in zip(idx, preds):
+                out[i] = float(s)
+        return out
+
     def rerank(self, query: str, hits_with_text: Sequence[tuple[Hit, str]], k: int = 5) -> list[Hit]:
         """Re-order candidate hits by cross-encoder score; return the top-k.
 
