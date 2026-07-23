@@ -38,6 +38,12 @@ visual = [
     "torch>=2.3",
     "sentence-transformers>=3.0",  # cross-encoder reranker
 ]
+# OCR fallback for scanned / image-only uploads (ingest/ocr.py). RapidOCR runs on onnxruntime
+# — no torch, no system Tesseract binary, ONNX models bundled in the wheel → offline on CPU.
+# Optional: if absent, scanned pages simply aren't indexed (ingestion degrades gracefully).
+ocr = [
+    "rapidocr-onnxruntime>=1.3",
+]
 # Orchestration + eval + observability (M3/M4).
 llmops = [
     "langgraph>=0.2",

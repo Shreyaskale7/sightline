@@ -3,6 +3,30 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — measure the baseline before optimizing.
 
+## Upload-path benchmark + OCR fallback: 0.667 → 1.000 on scanned docs (2026-07-23)
+
+Every other number here is on the SEC corpus, but the product's real use is *uploaded* user
+documents. So this is a self-contained upload benchmark — it generates its own fixtures (a
+services agreement, a board summary, and a **scanned/image-only invoice** whose text is
+rasterized to a picture, i.e. no text layer) and scores first-stage Recall@5 on them. Run it
+with `python -m sightline.eval.upload_bench`.
+
+The scanned document exposed a silent failure: the prefilter indexes each page's *extracted*
+text, but an image-only page yields `get_text() == ""`, so it's dropped from the index and is
+**unretrievable** — reranking can't rescue a page that was never a candidate.
+
+| Document kind | Recall@5 before | Recall@5 after OCR fallback |
+|---|--:|--:|
+| text-layer docs (4 Q) | 1.000 | 1.000 |
+| scanned / image-only (2 Q) | **0.000** | **1.000** |
+| overall (6 Q) | 0.667 | **1.000** |
+
+The fix (`ingest/ocr.py`): when a page's text layer is empty, OCR the PNG that was just rendered
+and index that text. It runs **only** on empty pages, so text PDFs — including every SEC filing —
+pay nothing and the 54-case benchmark is untouched. Backend is RapidOCR (ONNX/onnxruntime, no
+torch, no system Tesseract, models bundled → offline on CPU); if it isn't installed, scanned
+pages simply aren't indexed (graceful degradation, i.e. the pre-OCR behaviour).
+
 ## Generation scorecard on the champion retrieval (2026-07-13)
 
 The thesis was "generation is retrieval-bound." Here it is, tested: the SAME answerer + judge,

@@ -113,13 +113,15 @@ def build_pages(pdf_path: Path, out_dir: Path, accession: str, dpi: int = 175) -
         for i, page in enumerate(doc, start=1):
             img_path = out_dir / f"p{i:04d}.png"
             _render_page(page, img_path, dpi)
+            text = page.get_text().strip()
+            if not text:
+                # No text layer (scanned / image-only page): OCR the PNG we just rendered so the
+                # page can be indexed. Runs ONLY on empty pages, so text PDFs pay nothing.
+                from .ocr import ocr_image
+
+                text = ocr_image(img_path)
             pages.append(
-                Page(
-                    accession=accession,
-                    page_no=i,
-                    image_path=img_path,
-                    text=page.get_text().strip(),
-                )
+                Page(accession=accession, page_no=i, image_path=img_path, text=text)
             )
     finally:
         doc.close()
