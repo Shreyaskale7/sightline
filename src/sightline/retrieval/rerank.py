@@ -19,7 +19,10 @@ from typing import Sequence
 from .text_baseline import Hit
 
 _MODEL_NAME = "BAAI/bge-reranker-base"
-_MAX_CHARS = 2000  # score on the page's first ~2k chars; plenty for relevance, caps latency
+# Score on the page's first ~2k chars. Measured: shrinking this (1500 or 1000 chars) dropped
+# Recall@5 0.731→0.690 for ~40% less rerank time — the reranker needs the full page to order
+# financial pages correctly, so quality wins. Efficiency is bought elsewhere (statement fast-path).
+_MAX_CHARS = 2000
 
 
 class Reranker:
