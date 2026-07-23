@@ -22,6 +22,7 @@ from ..agents.router import Route, route
 from ..config import settings
 from ..observability import span
 from .decompose import decomposed_retrieve
+from .filters import QueryFilters
 from .text_baseline import Hit, TextRetriever
 
 
@@ -80,7 +81,12 @@ class RoutedRetriever:
 
         return self._reranker.rerank(query, pairs, k=k)
 
-    def retrieve(self, query: str, k: int = 5) -> list[Hit]:
+    def retrieve(
+        self, query: str, k: int = 5, filter_override: "QueryFilters | None" = None
+    ) -> list[Hit]:
+        # filter_override: an explicit search scope from serving (e.g. "only my uploaded docs").
+        # When set, skip SEC cross-company decomposition and always rerank — a single user
+        # corpus benefits from the cross-encoder, and there's no per-company interleave to protect.
         with span("route") as s:
             decision = route(query)
             s["decision"] = decision.route.value
@@ -89,10 +95,11 @@ class RoutedRetriever:
         # Fan out per company/filing regardless — decomposition never hurts recall of candidates.
         with span("retrieve.candidates") as s:
             candidates = decomposed_retrieve(
-                query, 20, self._chunked.retrieve, self._store.list_accessions
+                query, 20, self._chunked.retrieve, self._store.list_accessions,
+                filter_override=filter_override,
             )
             s["n_candidates"] = len(candidates)
-        if decision.route is Route.COMPARISON:
+        if filter_override is None and decision.route is Route.COMPARISON:
             # Reranking would re-crowd one company out; keep the interleaved order, take top-k.
             with span("rerank") as s:
                 s["skipped"] = "comparison — preserving per-company interleave"

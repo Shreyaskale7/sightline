@@ -10,7 +10,11 @@ from sightline.retrieval.text_baseline import Hit
 
 
 class _FakeChunked:
+    def __init__(self):
+        self.last_filter = "unset"
+
     def retrieve(self, query, k=5, query_filter=None):
+        self.last_filter = query_filter
         return [Hit("acc", i, 1.0, ticker="NVDA", form="10-K") for i in range(1, k + 1)]
 
 
@@ -57,3 +61,19 @@ def test_multi_hop_reranks():
     r, reranker = _routed()
     r.retrieve("How did NVIDIA's revenue change across its last three 10-Q filings?", k=5)
     assert reranker.called
+
+
+def test_scope_override_forces_upload_filter_and_reranks():
+    # A comparison-shaped question would normally SKIP rerank; an explicit upload scope must
+    # override that (single user corpus -> rerank helps) and constrain retrieval to uploads.
+    from sightline.retrieval.filters import QueryFilters
+
+    r, reranker = _routed()
+    r.retrieve(
+        "Which region had higher revenue, North America or Europe?",
+        k=5,
+        filter_override=QueryFilters(form="UPLOAD"),
+    )
+    assert reranker.called                       # override always reranks the single corpus
+    f = r._chunked.last_filter
+    assert f is not None and "UPLOAD" in str(f)  # retrieval was scoped to uploaded documents

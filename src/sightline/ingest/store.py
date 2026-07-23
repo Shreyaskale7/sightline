@@ -135,6 +135,15 @@ class MetadataStore:
     def count_pages(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
 
+    def has_uploads(self) -> bool:
+        """True if any user-uploaded document (form='UPLOAD') is indexed. Drives the product
+        default: once you've uploaded, your questions search YOUR documents, not the sample
+        SEC corpus. Cheap enough to check per query (indexed COUNT with a LIMIT)."""
+        row = self._conn.execute(
+            "SELECT 1 FROM filings WHERE form = 'UPLOAD' LIMIT 1"
+        ).fetchone()
+        return row is not None
+
     def list_accessions(self, ticker: str, form: str | None = None, limit: int = 3) -> list[str]:
         """Most-recent-first accession numbers for a ticker (optionally one form type).
         Used by decomposed retrieval: 'across the last three 10-Qs' -> one search per filing."""

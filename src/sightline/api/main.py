@@ -69,6 +69,10 @@ def _warmup() -> None:
 class QueryRequest(BaseModel):
     question: str
     k: int = 5
+    # Search scope. "auto" (product default): if you've uploaded documents and your question
+    # names no company in the sample corpus, search YOUR documents; otherwise the sample corpus.
+    # "uploads" forces your documents; "corpus" forces the SEC sample set.
+    scope: str = "auto"
 
 
 class Citation(BaseModel):
@@ -186,6 +190,29 @@ def page_image(accession: str, page_no: int) -> FileResponse:
     return FileResponse(page.image_path, media_type="image/png")
 
 
+def _resolve_scope(scope: str, question: str, data_dir: Path):
+    """Turn a requested scope into a retrieval filter override (or None for the sample corpus).
+
+    The product default ("auto") makes a user's own uploads the search scope: nobody comes to
+    this platform to look up NVIDIA's revenue — they bring their own documents and want answers
+    from THOSE. So if any upload exists and the question names no sample-corpus company, restrict
+    retrieval to uploaded documents. Naming a company (or scope="corpus") searches the SEC set.
+    """
+    from ..ingest.store import MetadataStore
+    from ..retrieval.filters import QueryFilters, parse_query_filters
+
+    scope = (scope or "auto").lower()
+    if scope == "corpus":
+        return None
+    if scope == "uploads":
+        return QueryFilters(form="UPLOAD")
+    # auto
+    if parse_query_filters(question).tickers:
+        return None  # explicitly about a sample company -> search the sample corpus
+    with MetadataStore(data_dir / "sightline.db") as store:
+        return QueryFilters(form="UPLOAD") if store.has_uploads() else None
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
     """Pipeline: retrieve top-k pages -> answer from their text -> verify citations.
@@ -209,7 +236,11 @@ def query(req: QueryRequest) -> QueryResponse:
         # Champion retrieval config (measured Recall@5 0.603): the router picks the best-per-slice
         # config — decomposition for comparisons, chunk+rerank for everything else.
         retriever = _get_retriever()
-        hits = retriever.retrieve(req.question, k=req.k)
+        with span("scope") as s:
+            override = _resolve_scope(req.scope, req.question, settings.data_dir)
+            s["scope"] = req.scope
+            s["searched"] = "uploads" if override is not None else "corpus"
+        hits = retriever.retrieve(req.question, k=req.k, filter_override=override)
         with MetadataStore(settings.data_dir / "sightline.db") as store:
             with span("fetch_pages") as s:
                 pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]

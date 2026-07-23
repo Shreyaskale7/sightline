@@ -114,6 +114,15 @@
   #go:hover:not(:disabled) { filter: brightness(1.07); }
   #go:disabled { opacity: .5; cursor: wait; }
   .askbar .fine { font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-top: 9px; }
+  .scopebar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .scopebar[hidden] { display: none; }  /* author display:flex would otherwise beat the UA [hidden] rule */
+  .scopebar .scopelbl { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); }
+  .scope-opt {
+    font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    background: none; color: var(--ink-mute); border: 1px solid var(--rule); padding: 4px 10px;
+  }
+  .scope-opt.active { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+  .scope-opt:hover:not(.active) { color: var(--ink); }
 
   .results { flex: 1; overflow-y: auto; padding: 22px 24px 60px; }
   .hint { max-width: 52ch; margin: 8vh auto 0; text-align: center; }
@@ -251,6 +260,11 @@
 
   <div class="main">
     <div class="askbar">
+      <div class="scopebar" id="scopeBar" hidden>
+        <span class="scopelbl">Searching</span>
+        <button type="button" class="scope-opt active" data-scope="uploads">My documents</button>
+        <button type="button" class="scope-opt" data-scope="corpus">Sample filings</button>
+      </div>
       <form id="f" class="askwrap">
         <input id="q" type="text" autocomplete="off" placeholder="Ask the filings a question…" required>
         <button id="go" type="submit">Ask</button>
@@ -282,6 +296,20 @@ const f = document.getElementById("f"), q = document.getElementById("q"),
 document.querySelectorAll(".ex").forEach(b =>
   b.addEventListener("click", () => { q.value = b.dataset.q; f.requestSubmit(); }));
 
+// Search scope. "auto" until the user uploads; then the toggle appears and the user picks
+// explicitly ("uploads" = their documents, "corpus" = the sample SEC filings). The backend's
+// "auto" already prefers uploads for company-free questions — the toggle just makes it visible.
+const scopeBar = document.getElementById("scopeBar");
+let currentScope = "auto";
+scopeBar.querySelectorAll(".scope-opt").forEach(b =>
+  b.addEventListener("click", () => {
+    scopeBar.querySelectorAll(".scope-opt").forEach(x => x.classList.toggle("active", x === b));
+    currentScope = b.dataset.scope;
+    q.placeholder = currentScope === "corpus"
+      ? "Ask the sample filings a question…" : "Ask your documents a question…";
+    q.focus();
+  }));
+
 const LETTERS = "ABCDEFGHIJ";
 
 f.addEventListener("submit", async (e) => {
@@ -295,7 +323,7 @@ f.addEventListener("submit", async (e) => {
   try {
     const r = await fetch("/query", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q.value, k: 5 }),
+      body: JSON.stringify({ question: q.value, k: 5, scope: currentScope }),
     });
     if (!r.ok) throw new Error("HTTP " + r.status + " — is the index built and an LLM key configured?");
     const d = await r.json();
@@ -379,7 +407,6 @@ uplFile.addEventListener("change", async () => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
 
-    let firstLabel = "";
     (d.documents || []).forEach(doc => {
       if (doc.error) {
         uplList.insertAdjacentHTML("beforeend",
@@ -388,7 +415,6 @@ uplFile.addEventListener("change", async () => {
         uplList.insertAdjacentHTML("beforeend",
           `<div class="irow"><b>${esc(doc.filename)}</b><span class="dots"></span><span>already on file</span></div>`);
       } else {
-        firstLabel = firstLabel || doc.label;
         uplList.insertAdjacentHTML("beforeend",
           `<div class="irow"><b>${esc(doc.label)}</b><span class="dots"></span><span>${doc.pages} pp · uploaded</span></div>`);
       }
@@ -400,7 +426,12 @@ uplFile.addEventListener("change", async () => {
     uplStatus.textContent = ok
       ? `✓ ${ok} DOCUMENT${ok === 1 ? "" : "S"} · ${d.total_pages} PAGES ON FILE — ASK AWAY${bad ? ` (${bad} REJECTED)` : ""}`
       : `✕ NOTHING INDEXED (${bad} REJECTED)`;
-    if (firstLabel) { q.value = `In the uploaded document ${firstLabel}, `; q.focus(); }
+    if (ok) {
+      // Documents on file -> surface the scope toggle and default to searching them.
+      scopeBar.hidden = false;
+      scopeBar.querySelector('[data-scope="uploads"]').click();
+      q.value = "";
+    }
   } catch (err) {
     uplStatus.className = "upl-status err";
     uplStatus.textContent = "✕ " + esc(String(err.message || err));

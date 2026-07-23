@@ -57,8 +57,18 @@ def decomposed_retrieve(
     k: int,
     retrieve_fn: RetrieveFn,
     list_accessions: ListAccessionsFn,
+    filter_override: QueryFilters | None = None,
 ) -> list[Hit]:
-    """Route the query and fan retrieval out per company or per filing when that shape needs it."""
+    """Route the query and fan retrieval out per company or per filing when that shape needs it.
+
+    filter_override: an explicit scope from the serving layer (e.g. "search only my uploaded
+    documents"). When set, it REPLACES the query-parsed company/form filter and takes the plain
+    single-query path — SEC cross-company decomposition doesn't apply to a user's own corpus.
+    The eval harness never passes it, so the benchmark path is provably unchanged.
+    """
+    if filter_override is not None:
+        return retrieve_fn(query, k=k, query_filter=to_qdrant_filter(filter_override))
+
     decision = route(query)
     filters = parse_query_filters(query)
 
