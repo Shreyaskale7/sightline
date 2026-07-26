@@ -57,11 +57,17 @@ class TextRetriever:
         model_name: str = _MODEL_NAME,
         chunked: bool = False,
         client: object | None = None,
+        chunk_target: int | None = None,
+        chunk_overlap: int | None = None,
     ) -> None:
         # chunked=True embeds each page as overlapping windows (see chunking.py) — fixes the
         # 512-token truncation blind spot. Separate collection so both variants coexist and
         # the ablation can measure the lift honestly.
+        # chunk_target/overlap override the window size (None = chunking.py's defaults). Smaller
+        # windows dilute a buried fact less — an experiment, so it must be measured before it ships.
         self.chunked = chunked
+        self.chunk_target = chunk_target
+        self.chunk_overlap = chunk_overlap
         self.collection = collection or ("sightline_text_chunks" if chunked else "sightline_text")
         self.model_name = model_name
         # Default to a local on-disk Qdrant next to the rest of the data.
@@ -130,8 +136,13 @@ class TextRetriever:
         if self.chunked:
             from .chunking import chunk_text
 
+            kw = {}
+            if self.chunk_target is not None:
+                kw["target"] = self.chunk_target
+            if self.chunk_overlap is not None:
+                kw["overlap"] = self.chunk_overlap
             for p in pages:
-                for i, c in enumerate(chunk_text(p.text)):
+                for i, c in enumerate(chunk_text(p.text, **kw)):
                     units.append((p, i, c))
         else:
             units = [(p, 0, p.text) for p in pages]

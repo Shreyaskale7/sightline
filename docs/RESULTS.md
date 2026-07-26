@@ -3,6 +3,48 @@
 Measured numbers, recorded as they are produced. The M1 text baseline is the row every
 later retrieval config (M2 visual/hybrid) must beat — measure the baseline before optimizing.
 
+## Two refuted first-stage hypotheses: smaller chunks and a bigger embedder (2026-07-26)
+
+After the RRF fusion fixed most of the rerank-stage loss, the remaining ceiling was **first-stage**:
+pool@20 recall 0.898, i.e. 5 cases whose gold page dense retrieval never surfaces
+(`nvda-foundry`, `intc-employees`, `amd-intc-rnd-compare`, `mrvl-revenue`, `onsemi-revenue`).
+
+Diagnosing the biggest failure cluster — employee-count questions — showed the headcount sentence
+sits inside a long page whose *dominant* topic is something else entirely (NVDA's gold page opens on
+export licences, AMD's on intellectual property, MU's on R&D; the headcount is 35–64% of the way in).
+Two hypotheses followed, and the benchmark **refuted both**.
+
+**Hypothesis 1 — the fact is diluted inside an 1800-char window; smaller windows will isolate it.**
+Wrong, and monotonically so:
+
+| chunk target | pool@20 | dense top-5 | employee cluster in pool |
+|---|--:|--:|--:|
+| **1800 (champion)** | **0.898** | **0.510** | **4/5** |
+| 900 | 0.857 | 0.490 | 3/5 |
+| 600 | 0.755 | 0.449 | 2/5 |
+
+A shorter window loses the surrounding context that makes it match the question at all, and more
+windows means more chances for a wrong one to outrank the right one. Chunk size is already at a
+good point; shrinking it trades away more than it buys.
+
+**Hypothesis 2 — BGE-small is the ceiling; a bigger embedder will lift it.** Also wrong, as measured
+in this setup (same chunking, same filter, same cases — only the model changed):
+
+| embedder | pool@20 | dense top-5 | pool misses |
+|---|--:|--:|--:|
+| **BGE-small-en-v1.5 (champion, 384-dim)** | **0.898** | **0.510** | **5** |
+| BGE-base-en-v1.5 (768-dim) | 0.776 | 0.449 | 11 |
+
+Caveat worth stating: this is a result about *this pipeline*, not a general claim that bge-base is a
+weaker model — a prefix/normalisation mismatch in the larger model's integration could explain part
+of it, and that hasn't been isolated. Either way, swapping it in as-is would have cost 12 points of
+first-stage recall, so it doesn't ship.
+
+Both experiments ran against separate collections and were deleted afterwards; the champion index
+and its 0.752 are untouched. The honest conclusion: **the cheap first-stage levers are exhausted.**
+The remaining misses need either query expansion for vocabulary mismatch (Intel says "85,100
+*people*", not "employees") or the GPU visual retriever — neither of which is a one-parameter change.
+
 ## Fusing the reranker with the dense rank: 0.731 → 0.752 (2026-07-24)
 
 Before optimizing retrieval further, I diagnosed *where* the misses come from — split each
