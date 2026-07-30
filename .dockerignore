@@ -1,0 +1,33 @@
+# Keep the build context small and the image lean.
+#
+# NOTE: data/pages, data/sightline.db and the chunked Qdrant collection ARE included on
+# purpose — the demo image serves real cited page images, so the corpus ships with it.
+# What's excluded below is everything the champion retrieval config does not use.
+
+# The late-interaction visual index (1.7 GB): implemented and measured, but NOT in the
+# champion config (docs/RESULTS.md) — so it has no place in the serving image.
+data/qdrant/collection/sightline_visual
+# The unchunked baseline collection: only used by ablation configs, not by serving.
+data/qdrant/collection/sightline_text
+# Per-machine LLM response cache — must not leak into a public image.
+data/llm_cache.db
+
+# Secrets never enter the image; they arrive as runtime env vars.
+.env
+
+# Dev-only
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+docs
+notebooks
+*.md
+!README.md
+SIGHTLINE_BUILD_BIBLE.pdf
