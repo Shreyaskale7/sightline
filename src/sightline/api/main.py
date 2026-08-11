@@ -181,13 +181,19 @@ async def upload(files: list[UploadFile]) -> UploadResponse:
 def page_image(accession: str, page_no: int) -> FileResponse:
     """Serve a cited page's PNG so the UI can show the evidence, not just claim it."""
     from ..config import settings
+    from ..ingest.rasterize import ensure_page_image
     from ..ingest.store import MetadataStore
 
     with MetadataStore(settings.data_dir / "sightline.db") as store:
         page = store.get_page(accession, page_no)
-    if page is None or not Path(page.image_path).exists():
+    if page is None:
         raise HTTPException(status_code=404, detail="page not found")
-    return FileResponse(page.image_path, media_type="image/png")
+    # Renders from the stored filing PDF on first request if the PNG isn't on disk — the
+    # deployed image ships PDFs only (see ensure_page_image), so this is the normal path there.
+    img = ensure_page_image(Path(page.image_path), page_no)
+    if img is None:
+        raise HTTPException(status_code=404, detail="page image unavailable")
+    return FileResponse(img, media_type="image/png")
 
 
 def _resolve_scope(scope: str, question: str, data_dir: Path):

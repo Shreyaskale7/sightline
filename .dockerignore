@@ -1,8 +1,10 @@
 # Keep the build context small and the image lean.
 #
-# NOTE: data/pages, data/sightline.db and the chunked Qdrant collection ARE included on
-# purpose — the demo image serves real cited page images, so the corpus ships with it.
-# What's excluded below is everything the champion retrieval config does not use.
+# NOTE: data/sightline.db, the chunked Qdrant collection, and the per-filing source PDFs ARE
+# included — the demo serves real cited pages. The rendered page PNGs are NOT: they are derived
+# data (2,353 images ~738 MB vs 32 source PDFs ~21 MB) and the app materializes each one on
+# first request (ingest.rasterize.ensure_page_image), caching it thereafter.
+data/pages/**/*.png
 
 # The late-interaction visual index (1.7 GB): implemented and measured, but NOT in the
 # champion config (docs/RESULTS.md) — so it has no place in the serving image.

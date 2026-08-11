@@ -88,10 +88,18 @@ def build_prompt(question: str, pages: Sequence[PageLike]) -> str:
     return _PROMPT.format(abstain=_ABSTAIN_TOKEN, pages="\n\n".join(blocks), question=question)
 
 
-def _encode_image(path: Path, max_width: int = _MAX_IMAGE_WIDTH) -> str:
-    """Load a page PNG, downscale to max_width, return a base64 data URL."""
+def _encode_image(path: Path, page_no: int = 0, max_width: int = _MAX_IMAGE_WIDTH) -> str:
+    """Load a page PNG, downscale to max_width, return a base64 data URL.
+
+    Renders the PNG from the stored filing PDF if it isn't on disk (the deployed image ships
+    PDFs only — see ingest.rasterize.ensure_page_image).
+    """
     from PIL import Image
 
+    from .ingest.rasterize import ensure_page_image
+
+    if page_no:
+        path = ensure_page_image(Path(path), page_no) or path
     img = Image.open(path)
     if img.width > max_width:
         img = img.resize((max_width, int(img.height * max_width / img.width)))
@@ -115,7 +123,7 @@ def build_visual_content(question: str, pages: Sequence[ImagePageLike]) -> list[
         })
         content.append({
             "type": "image_url",
-            "image_url": {"url": _encode_image(Path(p.image_path))},
+            "image_url": {"url": _encode_image(Path(p.image_path), p.page_no)},
         })
     content.append({"type": "text", "text": f"Question: {question}"})
     return content

@@ -80,6 +80,40 @@ def _render_page(page, out_path: Path, dpi: int) -> None:
     pix.save(str(out_path))
 
 
+def ensure_page_image(image_path: Path, page_no: int, dpi: int = 175) -> Path | None:
+    """Return a page PNG, rendering it from the stored filing PDF if it isn't on disk yet.
+
+    Page images are *derived* data: 2,353 of them weigh ~738 MB, while the 32 source PDFs they
+    come from weigh ~21 MB. So the serving image ships the PDFs only and materializes each PNG
+    the first time it is actually requested (then caches it on disk, so it renders once).
+
+    That keeps a deployable artifact ~13x smaller — the difference between fitting in a free
+    tier and not — at the cost of a few hundred ms on the first view of any given page.
+    Returns None if the page genuinely can't be produced (no PDF, page out of range).
+    """
+    image_path = Path(image_path)
+    if image_path.exists():
+        return image_path
+
+    pdf = image_path.parent / "filing.pdf"
+    if not pdf.exists():
+        return None
+    try:
+        import fitz
+
+        doc = fitz.open(pdf)
+        try:
+            if not (1 <= page_no <= doc.page_count):
+                return None
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            _render_page(doc[page_no - 1], image_path, dpi)
+        finally:
+            doc.close()
+    except Exception:
+        return None
+    return image_path if image_path.exists() else None
+
+
 def rasterize_pdf(pdf_path: Path, out_dir: Path, dpi: int = 175) -> list[Path]:
     """Rasterize each PDF page to a PNG. Returns image paths in page order (1-based names)."""
     import fitz

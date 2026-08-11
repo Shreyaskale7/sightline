@@ -28,12 +28,18 @@ REPO = Path(__file__).resolve().parent.parent
 INCLUDE = ["src", "scripts", "pyproject.toml", "Dockerfile", ".dockerignore"]
 
 # Corpus pieces the champion actually serves from.
+#
+# NOTE the page PNGs are NOT here. They are derived data: 2,353 images weigh ~738 MB, while the
+# 32 source PDFs they render from weigh ~21 MB. The serving app materializes each PNG on first
+# request (ingest.rasterize.ensure_page_image) and caches it, so shipping the PDFs alone makes
+# the deployable artifact ~13x smaller — the difference between fitting a free tier and not.
 DATA_INCLUDE = [
-    Path("data/pages"),
     Path("data/sightline.db"),
     Path("data/qdrant/collection/sightline_text_chunks"),
     Path("data/qdrant/meta.json"),
 ]
+# Per-filing source PDFs (data/pages/<accession>/filing.pdf), without the rendered PNGs.
+DATA_PDFS_GLOB = "data/pages/*/filing.pdf"
 
 # HF Spaces reads this frontmatter to configure the Space. sdk=docker + app_port=7860.
 SPACE_README = """---
@@ -97,6 +103,14 @@ def copy_into(out: Path) -> None:
         else:
             shutil.copy2(src, dst)
 
+    # Source PDFs only — the PNGs render on demand at serve time.
+    pdfs = sorted(REPO.glob(DATA_PDFS_GLOB))
+    for src in pdfs:
+        dst = out / src.relative_to(REPO)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+    print(f"  copied {len(pdfs)} filing PDFs (page images render on demand)")
+
 
 def dir_size_mb(p: Path) -> float:
     return sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) / 1024 / 1024
@@ -118,8 +132,7 @@ def main() -> None:
     (out / "README.md").write_text(SPACE_README.format(title=args.title), encoding="utf-8")
     (out / ".gitattributes").write_text(GITATTRIBUTES, encoding="utf-8")
 
-    print(f"\n  total: {dir_size_mb(out):.0f} MB")
-    print(f"  pages: {dir_size_mb(out / 'data/pages'):.0f} MB")
+    print(f"\n  total: {dir_size_mb(out):.0f} MB   (page PNGs excluded — rendered on demand)")
     print("\nNext:")
     print(f"  cd {out}")
     print("  git init && git lfs install")
