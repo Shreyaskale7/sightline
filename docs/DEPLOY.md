@@ -5,18 +5,25 @@ below stays on free tiers.
 
 ## What ships, and what doesn't
 
-The serving image carries the corpus, because the whole point is that a citation shows you the
-*actual* page. It deliberately leaves out anything the champion retrieval config doesn't use:
+The deployable artifact is **56 MB**. It carries the corpus — a citation has to show you the
+*actual* page — but only the parts that can't be regenerated:
 
 | Included | Size | Why |
 |---|--:|---|
-| `data/pages` (2,353 page images) | 758 MB | cited pages are rendered inline |
+| `data/pages/*/filing.pdf` (32 PDFs) | 21 MB | every page image renders from these |
 | `data/sightline.db` | 10 MB | page metadata + provenance |
 | `qdrant/sightline_text_chunks` | 26 MB | the champion index |
 | **Excluded** | | |
+| `data/pages/**/*.png` (2,353 images) | 738 MB | **derived data** — rendered on demand from the PDFs (below) |
 | `qdrant/sightline_visual` | 1.7 GB | implemented + measured, but **not in the champion** (`docs/RESULTS.md`) |
 | `qdrant/sightline_text` | 5 MB | unchunked baseline — ablation only |
 | `data/llm_cache.db`, `.env` | — | machine-local cache and secrets never enter an image |
+
+**Page images render on demand.** 2,353 PNGs weigh ~738 MB; the 32 PDFs they render from weigh
+~21 MB. `ingest.rasterize.ensure_page_image()` materializes a page the first time it is actually
+viewed (~200 ms) and caches it on disk, so the artifact is ~14x smaller with no loss — the
+re-render is byte-identical to the original (same renderer, same DPI; see
+`tests/test_ondemand_pages.py`). This is what keeps the deployment inside a free tier.
 
 The image also **bakes the two models in at build time** (BGE-small embedder + BGE-reranker-base
 cross-encoder) so a cold container starts without depending on a model host, and does *not*
@@ -34,7 +41,7 @@ install `colpali-engine` — that would add gigabytes to serve code that never r
    python scripts/prepare_space.py --out ../sightline-space
    ```
 
-   It prints the assembled size (~794 MB) and the exact next commands.
+   It prints the assembled size (~56 MB) and the exact next commands.
 
 3. Push it:
 
@@ -45,8 +52,13 @@ install `colpali-engine` — that would add gigabytes to serve code that never r
    git add -A && git commit -m "Sightline v1.0" && git push -u origin main
    ```
 
-   The first push moves ~800 MB — expect it to take a while on a home connection. The
-   `Dockerfile` is picked up automatically (port 7860).
+   The push is ~56 MB, so it completes in well under a minute. The `Dockerfile` is picked up
+   automatically (port 7860).
+
+   > **Do not enable persistent storage** on the Space. It is a paid add-on and you don't need
+   > it: rendered page images are a disk cache that regenerates itself from the PDFs after any
+   > restart. Persistent storage and any hardware above **CPU basic** are the two things that
+   > turn a free Space into a paid one.
 
 4. **Secrets** (Space → Settings → Variables and secrets) — never commit these:
    `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `ROUTER_MODEL`, `LLM_MIN_INTERVAL_S`,
