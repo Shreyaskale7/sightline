@@ -29,7 +29,7 @@ from typing import Any, Protocol, Sequence
 
 from .config import settings
 # Prompts live in the registry (prompts.py) so eval numbers pin to a prompt version.
-from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1
+from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1, COMPARE_CELL_V1
 from .observability import span
 
 # The model must tag claims like: [p:0001045810-26-000021#51]
@@ -42,6 +42,7 @@ _MAX_PAGE_CHARS = 6000
 
 _PROMPT = ANSWERER_V2.text
 _VISUAL_INSTRUCTIONS = ANSWERER_VISUAL_V1.text
+_CELL_PROMPT = COMPARE_CELL_V1.text
 
 _MAX_IMAGE_WIDTH = 1024  # downscale before sending: filings stay legible, tokens stay sane
 
@@ -175,6 +176,39 @@ class Answerer:
             s["abstained"] = result.abstained
             s["n_citations"] = len(result.citations)
             s["usage"] = getattr(resp, "usage", None)
+        return result
+
+    def answer_cell(
+        self, question: str, company: str, pages: Sequence[PageLike]
+    ) -> AnswerResult:
+        """One CELL of a comparison table: a bare value plus its citation, or an abstention.
+
+        Separate from answer() because the output contract is different — a table cell must be a
+        value, not a sentence, so it can sit in a column and be scanned. Each cell is answered
+        from that company's own retrieved pages, which is what lets a 15-company table be built
+        at all: nothing has to fit in one context window, and a wrong cell is individually
+        checkable against its own cited page.
+        """
+        if not pages:
+            return AnswerResult(answer="", citations=[], abstained=True)
+        self._ensure_client()
+        blocks = []
+        for p in pages:
+            header = f"--- PAGE [p:{p.accession}#{p.page_no}] ({p.ticker} {p.form}) ---"
+            blocks.append(f"{header}\n{p.text[:_MAX_PAGE_CHARS]}")
+        prompt = _CELL_PROMPT.format(
+            company=company, question=question, abstain=_ABSTAIN_TOKEN,
+            pages="\n\n".join(blocks),
+        )
+        with span("answer_cell", model=self.model, company=company, n_pages=len(pages)) as s:
+            resp = self._client.messages.create(
+                model=self.model,
+                max_tokens=120,      # a cell is a value + a tag; anything longer is the model rambling
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = parse_answer(resp.content[0].text)
+            s["abstained"] = result.abstained
+            s["n_citations"] = len(result.citations)
         return result
 
     def answer_from_images(

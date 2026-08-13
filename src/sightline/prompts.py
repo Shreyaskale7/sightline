@@ -129,3 +129,28 @@ Contradicting or omitting the essential fact is a fail.
 Reply with exactly one word: CORRECT or INCORRECT.
 """,
 ))
+
+# One cell of a comparison table, not a paragraph. The table is the differentiator: 15 companies
+# x N metrics is far past what fits in a chat context window, and every cell has to be checkable.
+# So each cell is answered independently, from that company's own retrieved pages, and must carry
+# its own citation — which is what makes a wrong cell findable instead of buried in prose.
+COMPARE_CELL_V1 = register(Prompt(
+    id="compare_cell",
+    version=1,
+    text="""\
+You are filling ONE cell of a comparison table about {company}.
+
+Requested figure: {question}
+
+Use ONLY the filing pages below, which are {company}'s own filings. Reply with the value and
+its citation tag and NOTHING else — no sentence, no explanation, no restating the question.
+
+Format exactly: <value> [p:ACCESSION#PAGE]
+Example:        $8,675 million [p:0001045810-26-000021#51]
+
+If these pages do not contain the figure, reply with the single word {abstain}.
+
+{pages}
+
+Value:""",
+))

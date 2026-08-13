@@ -114,6 +114,19 @@
   #go:hover:not(:disabled) { filter: brightness(1.07); }
   #go:disabled { opacity: .5; cursor: wait; }
   .askbar .fine { font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-top: 9px; }
+  /* Comparison table — one cited cell per company. The differentiator made visible. */
+  .cmp { background: var(--sheet); border: 1px solid var(--ink); box-shadow: var(--shadow); margin-bottom: 18px; }
+  .cmp .cmp-head { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+  .cmp .cmp-t { font-family: var(--display); font-size: 1.02rem; }
+  .cmp .cmp-meta { font-family: var(--mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); }
+  .cmp table { width: 100%; border-collapse: collapse; }
+  .cmp th, .cmp td { text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--rule); font-size: .9rem; }
+  .cmp th { font-family: var(--mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); font-weight: 400; }
+  .cmp td.tk { font-family: var(--mono); font-weight: 700; font-size: .8rem; width: 8.5rem; }
+  .cmp td.val { font-variant-numeric: tabular-nums; }
+  .cmp td.val.none { color: var(--red); font-style: italic; }
+  .cite-chip { font-family: var(--mono); font-size: .58rem; letter-spacing: .04em; background: none; border: 1px solid var(--rule); color: var(--ink-mute); padding: 2px 7px; cursor: pointer; }
+  .cite-chip:hover { border-color: var(--green); color: var(--green); }
   .scopebar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .scopebar[hidden] { display: none; }  /* author display:flex would otherwise beat the UA [hidden] rule */
   .scopebar .scopelbl { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); }
@@ -237,8 +250,9 @@
     </div>
     <div>
       <p class="side-h">Prepared questions</p>
+      <button class="ex" data-q="Compare research and development spend across every company"><span class="q-mark">§</span>R&amp;D across all 15 companies <em>— a cited table</em></button>
+      <button class="ex" data-q="Compare total revenue across every company"><span class="q-mark">§</span>Revenue across all 15 companies</button>
       <button class="ex" data-q="What was NVIDIA's total revenue in its most recent 10-K?"><span class="q-mark">Q.</span>NVIDIA’s total revenue, latest 10-K</button>
-      <button class="ex" data-q="How much did AMD spend on research and development in its most recent 10-K?"><span class="q-mark">Q.</span>AMD’s R&amp;D spend</button>
       <button class="ex" data-q="Which spent more on R&D in its most recent 10-K, NVIDIA or Intel?"><span class="q-mark">Q.</span>NVIDIA vs Intel on R&amp;D</button>
       <button class="ex" data-q="How did NVIDIA's quarterly revenue change across its last three 10-Q filings?"><span class="q-mark">Q.</span>NVIDIA’s revenue trend across 10-Qs</button>
       <button class="ex" data-q="What new process technology did Intel ramp into high-volume production in 2025?"><span class="q-mark">Q.</span>Intel’s new process node</button>
@@ -312,10 +326,64 @@ scopeBar.querySelectorAll(".scope-opt").forEach(b =>
 
 const LETTERS = "ABCDEFGHIJ";
 
+// A "compare" question fans out one cited cell per company instead of writing a paragraph.
+// Detected here (not server-side) so the UI can show the right working state and render a table.
+const CMP_RE = /^\s*(compare|table of|across (all|every|each)|for (all|every|each) compan)/i;
+
+function renderCompare(d, secs) {
+  const rows = d.rows || [];
+  let html = `<div class="cmp">
+      <div class="cmp-head">
+        <span class="cmp-t">${esc(d.question)}</span>
+        <span class="cmp-meta">${d.answered}/${rows.length} cited · ${secs}s</span>
+      </div>
+      <table><thead><tr><th>Company</th><th>Value</th><th>Source</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    const chip = (r.citations || []).length
+      ? `<button class="cite-chip" data-img="${r.citations[0].image_url}" data-cap="${esc(r.ticker)} · page ${r.citations[0].page_no}">p.${r.citations[0].page_no}</button>`
+      : "";
+    const val = r.error ? `<span class="none">unavailable (${esc(r.error)})</span>`
+              : r.abstained ? `<span class="none">not stated in these filings</span>`
+              : esc(r.value);
+    html += `<tr><td class="tk">${esc(r.ticker)}</td><td class="val">${val}</td><td>${chip}</td></tr>`;
+  }
+  html += `</tbody></table></div>
+    <p class="fine" style="padding:0 2px">Every cell answered from that company's own filings and
+    verified against the page it cites — cells the filings don't support say so instead of guessing.</p>`;
+  out.innerHTML = html;
+
+  out.querySelectorAll(".cite-chip").forEach(b => b.addEventListener("click", () => {
+    zoomimg.src = b.dataset.img; zoomcap.textContent = b.dataset.cap;
+    boxesEl.innerHTML = ""; zoom.showModal();
+  }));
+}
+
+async function runCompare(question) {
+  const t0 = performance.now();
+  out.innerHTML = `<div class="working">
+      <div class="steps"><span>SPLITTING BY COMPANY</span> · <span>SEARCHING EACH FILING</span> · <span>ONE CITED CELL EACH</span></div>
+      <div class="bar"><i></i></div>
+    </div>`;
+  const r = await fetch("/compare", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, k: 5 }),
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const d = await r.json();
+  renderCompare(d, ((performance.now() - t0) / 1000).toFixed(1));
+}
+
 f.addEventListener("submit", async (e) => {
   e.preventDefault();
   go.disabled = true;
   const t0 = performance.now();
+  // Comparison questions take the fan-out path: one cited cell per company, rendered as a table.
+  if (CMP_RE.test(q.value)) {
+    try { await runCompare(q.value); }
+    catch (err) { out.innerHTML = `<div class="answer abstain"><p class="txt">${esc(err.message)}</p></div>`; }
+    finally { go.disabled = false; }
+    return;
+  }
   out.innerHTML = `<div class="working">
       <div class="steps"><span>ROUTING</span> · <span>SEARCHING 2,353 PAGES</span> · <span>READING THE WINNERS</span> · <span>AUDITING CITATIONS</span></div>
       <div class="bar"><i></i></div>

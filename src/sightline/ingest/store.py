@@ -156,6 +156,19 @@ class MetadataStore:
         ).fetchone()
         return row is not None
 
+    def list_tickers(self, exclude_uploads: bool = True) -> list[str]:
+        """Distinct company tickers in the corpus, alphabetical.
+
+        Used by cross-corpus comparison ("compare R&D across every company"): the question
+        names no companies, so the set has to come from what's actually indexed. Uploads are
+        excluded by default — a user's own documents aren't part of the sample peer group.
+        """
+        q = "SELECT DISTINCT ticker FROM filings"
+        if exclude_uploads:
+            q += " WHERE form != 'UPLOAD'"
+        q += " ORDER BY ticker"
+        return [r["ticker"] for r in self._conn.execute(q)]
+
     def list_accessions(self, ticker: str, form: str | None = None, limit: int = 3) -> list[str]:
         """Most-recent-first accession numbers for a ticker (optionally one form type).
         Used by decomposed retrieval: 'across the last three 10-Qs' -> one search per filing."""

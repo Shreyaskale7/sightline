@@ -196,6 +196,69 @@ def page_image(accession: str, page_no: int) -> FileResponse:
     return FileResponse(img, media_type="image/png")
 
 
+class CompareRequest(BaseModel):
+    question: str                       # the figure to put in the column, e.g. "R&D spend"
+    tickers: list[str] = []             # empty -> every company in the corpus (capped)
+    k: int = 5
+
+
+class CompareCell(BaseModel):
+    ticker: str
+    value: str = ""
+    citations: list[Citation] = []
+    abstained: bool = False
+    error: str = ""
+
+
+class CompareResponse(BaseModel):
+    question: str
+    rows: list[CompareCell] = []
+    answered: int = 0
+    truncated_to: int = 0
+    latency_ms: float = 0.0
+
+
+@app.post("/compare", response_model=CompareResponse)
+def compare_endpoint(req: CompareRequest) -> CompareResponse:
+    """Answer one question once PER COMPANY and return a table of individually-cited cells.
+
+    The capability a chat window can't match: the corpus is far past any context window, and
+    every cell is checkable on its own page rather than buried in prose. Costs one LLM call per
+    company, so the company list is capped (compare.MAX_COMPANIES).
+    """
+    import time
+
+    from ..compare import compare, resolve_companies
+    from ..config import settings
+    from ..ingest.store import MetadataStore
+    from ..observability import trace
+
+    t0 = time.perf_counter()
+    with _query_lock, trace("compare", question=req.question) as stages:
+        retriever = _get_retriever()
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
+            tickers, truncated = resolve_companies(
+                req.question, store.list_tickers(), named=req.tickers
+            )
+            result = compare(req.question, tickers, retriever, store, k=req.k)
+
+            rows = []
+            for r in result.rows:
+                rows.append(CompareCell(
+                    ticker=r.ticker, value=r.value, abstained=r.abstained, error=r.error,
+                    citations=[
+                        Citation(accession=c.accession, page_no=c.page_no,
+                                 image_url=f"/pages/{c.accession}/{c.page_no}")
+                        for c in r.citations
+                    ],
+                ))
+    _ = stages
+    return CompareResponse(
+        question=req.question, rows=rows, answered=result.answered,
+        truncated_to=truncated, latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+    )
+
+
 def _resolve_scope(scope: str, question: str, data_dir: Path):
     """Turn a requested scope into a retrieval filter override (or None for the sample corpus).
 
