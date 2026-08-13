@@ -46,6 +46,18 @@ CREATE INDEX IF NOT EXISTS idx_pages_accession ON pages(accession);
 """
 
 
+def _norm_path(raw: str) -> Path:
+    """Read a stored image path in an OS-portable way.
+
+    Rows written on Windows store separators as backslashes ("data\\pages\\acc\\p0001.png").
+    On POSIX those are *not* separators — the whole string becomes one filename, so .exists()
+    fails and .parent collapses to ".". That breaks page serving whenever an index built on one
+    OS is deployed on another (exactly what happens when a Windows-built corpus ships to a Linux
+    container). Normalizing on read keeps the stored rows untouched and fixes every consumer.
+    """
+    return Path(raw.replace("\\", "/"))
+
+
 @dataclass
 class StoredPage:
     """A page row read back out of the store (image + prefilter text + provenance)."""
@@ -172,7 +184,7 @@ class MetadataStore:
         return StoredPage(
             accession=r["accession"],
             page_no=r["page_no"],
-            image_path=Path(r["image_path"]),
+            image_path=_norm_path(r["image_path"]),
             text=r["text"],
             ticker=r["ticker"],
             form=r["form"],
@@ -193,7 +205,7 @@ class MetadataStore:
         for r in cur:
             yield StoredPage(
                 accession=r["accession"], page_no=r["page_no"],
-                image_path=Path(r["image_path"]), text=r["text"],
+                image_path=_norm_path(r["image_path"]), text=r["text"],
                 ticker=r["ticker"], form=r["form"], filing_date=r["filing_date"],
             )
 
@@ -211,7 +223,7 @@ class MetadataStore:
             yield StoredPage(
                 accession=r["accession"],
                 page_no=r["page_no"],
-                image_path=Path(r["image_path"]),
+                image_path=_norm_path(r["image_path"]),
                 text=r["text"],
                 ticker=r["ticker"],
                 form=r["form"],

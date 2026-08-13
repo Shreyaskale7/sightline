@@ -1,0 +1,34 @@
+# What gets uploaded to Cloud Build as the source context.
+#
+# This file must exist. Without it gcloud falls back to .gitignore, which excludes data/ —
+# and the app would deploy with no corpus at all (every query would return nothing).
+# Deliberately NO "#!include:.gitignore" here for that exact reason.
+#
+# Mirrors .dockerignore: ship the source PDFs + SQLite + the chunked index; leave out the
+# rendered page PNGs (derived data, ~738 MB, regenerated on demand at serve time) and the
+# late-interaction visual index (measured out of the champion config).
+
+# Rendered page images — regenerated on first view from data/pages/*/filing.pdf
+data/pages/**/*.png
+
+# Indexes the champion doesn't serve from
+data/qdrant/collection/sightline_visual
+data/qdrant/collection/sightline_text
+
+# Machine-local cache and secrets never leave this box
+data/llm_cache.db
+.env
+
+# Dev-only
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+docs
+SIGHTLINE_BUILD_BIBLE.pdf
