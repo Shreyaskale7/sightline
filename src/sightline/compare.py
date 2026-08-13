@@ -123,6 +123,67 @@ def compare(
     return result
 
 
+@dataclass
+class ScreenRow:
+    ticker: str
+    matched: bool = False
+    evidence: str = ""                                # the sentence that justifies a YES
+    citations: list[Citation] = field(default_factory=list)
+    error: str = ""
+
+
+@dataclass
+class ScreenResult:
+    criterion: str
+    rows: list[ScreenRow] = field(default_factory=list)
+
+    @property
+    def matches(self) -> list[ScreenRow]:
+        return [r for r in self.rows if r.matched]
+
+
+def screen(
+    criterion: str,
+    tickers: list[str],
+    retriever,
+    store,
+    answerer: Answerer | None = None,
+    k: int = 5,
+) -> ScreenResult:
+    """Ask a yes/no of every company and return the hits with their evidence.
+
+    "Which of these companies flag TSMC dependency as a risk?" is a corpus scan, not a lookup:
+    answering it means touching all 15 filings, which is exactly what a chat window holding one
+    document cannot do. Same fan-out as compare(); the difference is that a hit must quote and
+    cite the sentence that justifies it, so the resulting list is auditable row by row.
+    """
+    answerer = answerer or Answerer()
+    result = ScreenResult(criterion=criterion)
+
+    with span("screen", n_companies=len(tickers)) as s:
+        for ticker in tickers:
+            row = ScreenRow(ticker=ticker)
+            try:
+                hits = retriever.retrieve(
+                    criterion, k=k, filter_override=QueryFilters(tickers=[ticker])
+                )
+                pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
+                matched, evidence = answerer.screen_cell(criterion, ticker, pages)
+                if matched:
+                    # A YES is only a YES if its citation survives verification — otherwise the
+                    # model matched on a page it never actually read.
+                    verdict = verify(evidence, {(p.accession, p.page_no) for p in pages})
+                    if not verdict.result.abstained:
+                        row.matched = True
+                        row.evidence = _strip_tags(verdict.result.answer).lstrip("YES").lstrip("—- ").strip()
+                        row.citations = verdict.result.citations
+            except Exception as e:
+                row.error = f"{type(e).__name__}"
+            result.rows.append(row)
+        s["matched"] = len(result.matches)
+    return result
+
+
 def _strip_tags(text: str) -> str:
     """Remove the inline [p:acc#page] tags from a cell — the citation is rendered as a chip
     next to the value, so repeating it in the text would just be noise."""

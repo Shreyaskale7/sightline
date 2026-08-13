@@ -154,3 +154,29 @@ If these pages do not contain the figure, reply with the single word {abstain}.
 
 Value:""",
 ))
+
+# Screening asks a yes/no of every company in the corpus — "which of these flag TSMC
+# dependency as a risk?" The verdict is worthless without the sentence that justifies it, so a
+# YES must quote its own evidence and cite the page. Same fan-out as the comparison table; what
+# differs is the cell contract, because the useful output here is a filtered list, not a figure.
+SCREEN_CELL_V1 = register(Prompt(
+    id="screen_cell",
+    version=1,
+    text="""\
+You are screening {company}'s filings for one criterion.
+
+Criterion: {question}
+
+Use ONLY the filing pages below, which are {company}'s own filings. Reply in exactly one of
+these two forms and nothing else:
+
+  YES — <short quote or paraphrase of the supporting sentence> [p:ACCESSION#PAGE]
+  NO
+
+Answer YES only if these pages actually state it. If the pages simply do not address the
+criterion, answer NO. Do not speculate about what the company probably does.
+
+{pages}
+
+Verdict:""",
+))

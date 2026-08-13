@@ -259,6 +259,67 @@ def compare_endpoint(req: CompareRequest) -> CompareResponse:
     )
 
 
+class ScreenRequest(BaseModel):
+    criterion: str                      # e.g. "depends on TSMC for manufacturing"
+    tickers: list[str] = []
+    k: int = 5
+
+
+class ScreenHit(BaseModel):
+    ticker: str
+    matched: bool = False
+    evidence: str = ""
+    citations: list[Citation] = []
+    error: str = ""
+
+
+class ScreenResponse(BaseModel):
+    criterion: str
+    rows: list[ScreenHit] = []
+    matched: int = 0
+    screened: int = 0
+    latency_ms: float = 0.0
+
+
+@app.post("/screen", response_model=ScreenResponse)
+def screen_endpoint(req: ScreenRequest) -> ScreenResponse:
+    """Ask a yes/no of every company and return the hits with their evidence.
+
+    A corpus scan, not a lookup: answering it touches every filing, and each hit quotes and
+    cites the sentence that justifies it — so the shortlist is auditable row by row.
+    """
+    import time
+
+    from ..compare import resolve_companies, screen
+    from ..config import settings
+    from ..ingest.store import MetadataStore
+    from ..observability import trace
+
+    t0 = time.perf_counter()
+    with _query_lock, trace("screen", criterion=req.criterion):
+        retriever = _get_retriever()
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
+            tickers, _ = resolve_companies(
+                req.criterion, store.list_tickers(), named=req.tickers
+            )
+            result = screen(req.criterion, tickers, retriever, store, k=req.k)
+            rows = [
+                ScreenHit(
+                    ticker=r.ticker, matched=r.matched, evidence=r.evidence, error=r.error,
+                    citations=[
+                        Citation(accession=c.accession, page_no=c.page_no,
+                                 image_url=f"/pages/{c.accession}/{c.page_no}")
+                        for c in r.citations
+                    ],
+                )
+                for r in result.rows
+            ]
+    return ScreenResponse(
+        criterion=req.criterion, rows=rows, matched=len(result.matches),
+        screened=len(rows), latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+    )
+
+
 def _resolve_scope(scope: str, question: str, data_dir: Path):
     """Turn a requested scope into a retrieval filter override (or None for the sample corpus).
 

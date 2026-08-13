@@ -29,7 +29,7 @@ from typing import Any, Protocol, Sequence
 
 from .config import settings
 # Prompts live in the registry (prompts.py) so eval numbers pin to a prompt version.
-from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1, COMPARE_CELL_V1
+from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1, COMPARE_CELL_V1, SCREEN_CELL_V1
 from .observability import span
 
 # The model must tag claims like: [p:0001045810-26-000021#51]
@@ -43,6 +43,7 @@ _MAX_PAGE_CHARS = 6000
 _PROMPT = ANSWERER_V2.text
 _VISUAL_INSTRUCTIONS = ANSWERER_VISUAL_V1.text
 _CELL_PROMPT = COMPARE_CELL_V1.text
+_SCREEN_PROMPT = SCREEN_CELL_V1.text
 
 _MAX_IMAGE_WIDTH = 1024  # downscale before sending: filings stay legible, tokens stay sane
 
@@ -210,6 +211,38 @@ class Answerer:
             s["abstained"] = result.abstained
             s["n_citations"] = len(result.citations)
         return result
+
+    def screen_cell(
+        self, question: str, company: str, pages: Sequence[PageLike]
+    ) -> tuple[bool, AnswerResult]:
+        """Screen ONE company against a criterion: (matched, evidence).
+
+        Distinct from answer_cell because the useful output is a filtered list, not a figure —
+        but the discipline is the same: a YES has to quote the sentence that justifies it and
+        cite the page, so a screening hit is auditable rather than asserted. Pages that simply
+        don't address the criterion are a NO, not a guess about what the company probably does.
+        """
+        if not pages:
+            return False, AnswerResult(answer="", citations=[], abstained=True)
+        self._ensure_client()
+        blocks = []
+        for p in pages:
+            header = f"--- PAGE [p:{p.accession}#{p.page_no}] ({p.ticker} {p.form}) ---"
+            blocks.append(f"{header}\n{p.text[:_MAX_PAGE_CHARS]}")
+        prompt = _SCREEN_PROMPT.format(
+            company=company, question=question, pages="\n\n".join(blocks)
+        )
+        with span("screen_cell", model=self.model, company=company, n_pages=len(pages)) as s:
+            resp = self._client.messages.create(
+                model=self.model,
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = (resp.content[0].text or "").strip()
+            matched = raw.upper().lstrip("*_ ").startswith("YES")
+            result = parse_answer(raw) if matched else AnswerResult(answer=raw, citations=[])
+            s["matched"] = matched
+        return matched, result
 
     def answer_from_images(
         self, question: str, pages: Sequence[ImagePageLike], max_images: int = 3
