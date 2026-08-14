@@ -325,6 +325,12 @@ def screen_endpoint(req: ScreenRequest) -> ScreenResponse:
     )
 
 
+class WatchRequest(BaseModel):
+    # Explicit model rather than a bare `list[str]` param: FastAPI binds an unannotated list as
+    # a body field, so a query-string form would silently never bind.
+    tickers: list[str] = []      # empty -> every company already in the corpus
+
+
 class WatchResponse(BaseModel):
     checked: list[str] = []
     new_filings: list[dict] = []
@@ -334,7 +340,7 @@ class WatchResponse(BaseModel):
 
 
 @app.post("/watch", response_model=WatchResponse)
-def watch_endpoint(tickers: list[str] | None = None) -> WatchResponse:
+def watch_endpoint(req: WatchRequest | None = None) -> WatchResponse:
     """Which filings exist at the SEC that this corpus hasn't ingested.
 
     An indexed corpus goes stale silently — it keeps answering confidently from last quarter's
@@ -350,8 +356,9 @@ def watch_endpoint(tickers: list[str] | None = None) -> WatchResponse:
     from ..watch import find_new_filings
 
     t0 = time.perf_counter()
+    requested = req.tickers if req else []
     with MetadataStore(settings.data_dir / "sightline.db") as store:
-        watched = [t.upper() for t in (tickers or store.list_tickers())]
+        watched = [t.upper() for t in (requested or store.list_tickers())]
         client = EdgarClient()
         try:
             rep = find_new_filings(client, store, watched)
