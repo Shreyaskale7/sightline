@@ -94,6 +94,11 @@ class QueryResponse(BaseModel):
     abstained: bool
     trace: list[Stage] = []      # the rendered pipeline: every stage + timing
     latency_ms: float = 0.0
+    # Numeric grounding (advisory). The verifier already guarantees citations point at pages we
+    # retrieved; these two surface the failure mode it can't see — right page, wrong number —
+    # and conflicts between the cited pages themselves.
+    unsupported_figures: list[str] = []
+    disagreements: list[str] = []
 
 
 @app.get("/health")
@@ -320,6 +325,50 @@ def screen_endpoint(req: ScreenRequest) -> ScreenResponse:
     )
 
 
+class WatchResponse(BaseModel):
+    checked: list[str] = []
+    new_filings: list[dict] = []
+    errors: dict[str, str] = {}
+    is_stale: bool = False
+    latency_ms: float = 0.0
+
+
+@app.post("/watch", response_model=WatchResponse)
+def watch_endpoint(tickers: list[str] | None = None) -> WatchResponse:
+    """Which filings exist at the SEC that this corpus hasn't ingested.
+
+    An indexed corpus goes stale silently — it keeps answering confidently from last quarter's
+    numbers with no sign anything newer exists. This makes staleness checkable. Detection only:
+    ingesting is slow and side-effectful, so it stays a separate, deliberate step, and
+    scheduling belongs to the deployment (a cron hitting this) rather than in the app.
+    """
+    import time
+
+    from ..config import settings
+    from ..ingest.edgar import EdgarClient
+    from ..ingest.store import MetadataStore
+    from ..watch import find_new_filings
+
+    t0 = time.perf_counter()
+    with MetadataStore(settings.data_dir / "sightline.db") as store:
+        watched = [t.upper() for t in (tickers or store.list_tickers())]
+        client = EdgarClient()
+        try:
+            rep = find_new_filings(client, store, watched)
+        finally:
+            client.close()
+    return WatchResponse(
+        checked=rep.checked,
+        new_filings=[
+            {"ticker": f.ticker, "form": f.form, "accession": f.accession,
+             "filing_date": f.filing_date}
+            for f in rep.new_filings
+        ],
+        errors=rep.errors, is_stale=rep.is_stale,
+        latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+    )
+
+
 class DiffRequest(BaseModel):
     topic: str                          # e.g. "total revenue for the quarter"
     ticker: str
@@ -434,6 +483,26 @@ def query(req: QueryRequest) -> QueryResponse:
                 s["dropped_citations"] = verdict.dropped_citations
             result = verdict.result
 
+            # Numeric grounding: the verifier proved the citations point at pages we retrieved;
+            # this checks the figures are actually ON those pages (right page, wrong number),
+            # and whether the cited pages contradict each other. Advisory — it reports, it does
+            # not rewrite, because deleting a correct claim is worse than flagging a odd one.
+            from ..grounding import check_answer
+
+            with span("grounding") as s:
+                cited_text = {
+                    (p.accession, p.page_no): p.text
+                    for p in pages
+                    if (p.accession, p.page_no) in {(c.accession, c.page_no)
+                                                    for c in result.citations}
+                }
+                gr = check_answer(result.answer, cited_text)
+                unsupported = [f.text for f in gr.unsupported]
+                disagreements = gr.disagreements
+                s["figures"] = len(gr.figures)
+                s["unsupported"] = len(unsupported)
+                s["disagreements"] = len(disagreements)
+
             # Region highlighting: locate the answer's salient figures on each cited page.
             from ..highlight import page_boxes, salient_terms
 
@@ -457,4 +526,5 @@ def query(req: QueryRequest) -> QueryResponse:
     return QueryResponse(
         answer=result.answer, citations=citations, abstained=result.abstained,
         trace=trace_stages, latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+        unsupported_figures=unsupported, disagreements=disagreements,
     )
