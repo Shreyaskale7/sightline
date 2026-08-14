@@ -180,3 +180,31 @@ criterion, answer NO. Do not speculate about what the company probably does.
 
 Verdict:""",
 ))
+
+# Diffing two periods of the same company. The hard part isn't summarizing either filing — it's
+# that a claim about *change* needs support from BOTH sides, so each point cites the earlier page
+# and the later one. "No material change" is a valid and useful finding, not a failure to answer.
+DIFF_V1 = register(Prompt(
+    id="diff",
+    version=1,
+    text="""\
+You are comparing how {company} described one topic in two different filings.
+
+Topic: {topic}
+
+EARLIER FILING ({old_label}) pages follow, then LATER FILING ({new_label}) pages.
+
+Report only what genuinely CHANGED between them, as up to four short bullets. Rules:
+1. Every bullet must cite the pages it is based on, using the exact [p:ACCESSION#PAGE] tags from
+   the headers — cite the earlier page and the later page when the point compares the two.
+2. Report changes in substance (figures, added or removed language, shifts in emphasis), not
+   differences in wording or formatting.
+3. Use only these pages. Do not infer what probably changed.
+4. If the two filings say materially the same thing, reply with exactly:
+   NO MATERIAL CHANGE
+   followed by one citation from each filing.
+
+{pages}
+
+Changes:""",
+))

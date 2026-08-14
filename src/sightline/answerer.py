@@ -29,7 +29,13 @@ from typing import Any, Protocol, Sequence
 
 from .config import settings
 # Prompts live in the registry (prompts.py) so eval numbers pin to a prompt version.
-from .prompts import ANSWERER_V2, ANSWERER_VISUAL_V1, COMPARE_CELL_V1, SCREEN_CELL_V1
+from .prompts import (
+    ANSWERER_V2,
+    ANSWERER_VISUAL_V1,
+    COMPARE_CELL_V1,
+    DIFF_V1,
+    SCREEN_CELL_V1,
+)
 from .observability import span
 
 # The model must tag claims like: [p:0001045810-26-000021#51]
@@ -44,6 +50,7 @@ _PROMPT = ANSWERER_V2.text
 _VISUAL_INSTRUCTIONS = ANSWERER_VISUAL_V1.text
 _CELL_PROMPT = COMPARE_CELL_V1.text
 _SCREEN_PROMPT = SCREEN_CELL_V1.text
+_DIFF_PROMPT = DIFF_V1.text
 
 _MAX_IMAGE_WIDTH = 1024  # downscale before sending: filings stay legible, tokens stay sane
 
@@ -243,6 +250,54 @@ class Answerer:
             result = parse_answer(raw) if matched else AnswerResult(answer=raw, citations=[])
             s["matched"] = matched
         return matched, result
+
+    def answer_diff(
+        self,
+        topic: str,
+        company: str,
+        old_label: str,
+        old_pages: Sequence[PageLike],
+        new_label: str,
+        new_pages: Sequence[PageLike],
+    ) -> AnswerResult:
+        """Describe what changed on `topic` between two filings of the same company.
+
+        Both sides go into one prompt, clearly separated and individually labelled, because a
+        claim about *change* has to be supported from both — which is also why the verifier
+        downstream is given the union of both page sets.
+        """
+        if not old_pages or not new_pages:
+            return AnswerResult(answer="", citations=[], abstained=True)
+        self._ensure_client()
+
+        def _block(header: str, pages: Sequence[PageLike]) -> str:
+            out = [header]
+            for p in pages:
+                out.append(
+                    f"--- PAGE [p:{p.accession}#{p.page_no}] ({p.ticker} {p.form}) ---\n"
+                    f"{p.text[:_MAX_PAGE_CHARS]}"
+                )
+            return "\n\n".join(out)
+
+        pages_text = (
+            _block(f"===== EARLIER FILING: {old_label} =====", old_pages)
+            + "\n\n"
+            + _block(f"===== LATER FILING: {new_label} =====", new_pages)
+        )
+        prompt = _DIFF_PROMPT.format(
+            company=company, topic=topic, old_label=old_label,
+            new_label=new_label, pages=pages_text,
+        )
+        with span("answer_diff", model=self.model, company=company,
+                  n_old=len(old_pages), n_new=len(new_pages)) as s:
+            resp = self._client.messages.create(
+                model=self.model,
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = parse_answer(resp.content[0].text)
+            s["n_citations"] = len(result.citations)
+        return result
 
     def answer_from_images(
         self, question: str, pages: Sequence[ImagePageLike], max_images: int = 3

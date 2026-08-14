@@ -52,10 +52,14 @@ _FORM_UPLOAD = re.compile(r"\bupload(ed)?\b|\bmy (document|report|file|pdf)\b|\b
 class QueryFilters:
     tickers: list[str] = field(default_factory=list)
     form: str | None = None  # "10-K" | "10-Q" | None
+    # Pin the search to specific filings. Never parsed from a question — a user doesn't type
+    # accession numbers — but set programmatically by callers that already know which filings
+    # they mean: multi-hop fan-out, and diffing one period against another.
+    accessions: list[str] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
-        return not self.tickers and self.form is None
+        return not self.tickers and self.form is None and not self.accessions
 
 
 def parse_query_filters(question: str) -> QueryFilters:
@@ -82,6 +86,9 @@ def to_qdrant_filter(f: QueryFilters):
     from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
     must = []
+    if f.accessions:
+        # Most specific constraint: a named filing already implies its company and form.
+        must.append(FieldCondition(key="accession", match=MatchAny(any=f.accessions)))
     if f.tickers:
         must.append(FieldCondition(key="ticker", match=MatchAny(any=f.tickers)))
     if f.form:

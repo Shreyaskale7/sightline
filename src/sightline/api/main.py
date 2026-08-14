@@ -320,6 +320,58 @@ def screen_endpoint(req: ScreenRequest) -> ScreenResponse:
     )
 
 
+class DiffRequest(BaseModel):
+    topic: str                          # e.g. "total revenue for the quarter"
+    ticker: str
+    form: str = "10-Q"
+    k: int = 4
+
+
+class DiffResponse(BaseModel):
+    ticker: str
+    topic: str
+    older: str = ""                     # human label, e.g. "10-Q filed 2025-11-19"
+    newer: str = ""
+    summary: str = ""
+    citations: list[Citation] = []
+    no_material_change: bool = False
+    error: str = ""
+    latency_ms: float = 0.0
+
+
+@app.post("/diff", response_model=DiffResponse)
+def diff_endpoint(req: DiffRequest) -> DiffResponse:
+    """What changed on a topic between a company's two most recent filings of one form.
+
+    Each side is retrieved pinned to its own accession, so the two periods stay genuinely
+    separate, and every claim about change is verified against the union of both page sets.
+    """
+    import time
+
+    from ..config import settings
+    from ..diff import diff_filings
+    from ..ingest.store import MetadataStore
+    from ..observability import trace
+
+    t0 = time.perf_counter()
+    with _query_lock, trace("diff", ticker=req.ticker, topic=req.topic):
+        retriever = _get_retriever()
+        with MetadataStore(settings.data_dir / "sightline.db") as store:
+            r = diff_filings(req.topic, req.ticker.upper(), retriever, store,
+                             form=req.form, k=req.k)
+    return DiffResponse(
+        ticker=r.ticker, topic=r.topic,
+        older=r.older.label if r.older else "", newer=r.newer.label if r.newer else "",
+        summary=r.summary, no_material_change=r.no_material_change, error=r.error,
+        citations=[
+            Citation(accession=c.accession, page_no=c.page_no,
+                     image_url=f"/pages/{c.accession}/{c.page_no}")
+            for c in r.citations
+        ],
+        latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+    )
+
+
 def _resolve_scope(scope: str, question: str, data_dir: Path):
     """Turn a requested scope into a retrieval filter override (or None for the sample corpus).
 
