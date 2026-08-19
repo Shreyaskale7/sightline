@@ -131,12 +131,28 @@ def rasterize_pdf(pdf_path: Path, out_dir: Path, dpi: int = 175) -> list[Path]:
     return paths
 
 
-def build_pages(pdf_path: Path, out_dir: Path, accession: str, dpi: int = 175) -> list[Page]:
+def build_pages(
+    pdf_path: Path,
+    out_dir: Path,
+    accession: str,
+    dpi: int = 175,
+    write_images: bool = True,
+) -> list[Page]:
     """Produce Page records (image + aligned text) for one filing, in one PDF pass.
 
     Doing the raster and the text extraction in the same loop guarantees the PNG and the text
     for a given page_no describe the *same* page -- so a retrieval hit on the text side always
     points at the right image.
+
+    `write_images=False` skips writing the PNGs and records where each one *will* live, letting
+    `ensure_page_image` render it from this PDF on first view. That matters at serving time: a
+    container's writable filesystem is often memory-backed, so rasterizing a few hundred pages
+    up front means a few hundred MB of RAM on top of the loaded models — enough to get the
+    process OOM-killed mid-upload. Since page images are derived data we already render on
+    demand, writing them eagerly buys nothing here.
+
+    A page with no text layer is the exception: OCR needs an actual image, so that page is
+    rendered regardless. Those are rare and the cost is bounded to the pages that need it.
     """
     import fitz
 
@@ -146,11 +162,12 @@ def build_pages(pdf_path: Path, out_dir: Path, accession: str, dpi: int = 175) -
     try:
         for i, page in enumerate(doc, start=1):
             img_path = out_dir / f"p{i:04d}.png"
-            _render_page(page, img_path, dpi)
             text = page.get_text().strip()
+            if write_images or not text:
+                _render_page(page, img_path, dpi)
             if not text:
-                # No text layer (scanned / image-only page): OCR the PNG we just rendered so the
-                # page can be indexed. Runs ONLY on empty pages, so text PDFs pay nothing.
+                # No text layer (scanned / image-only page): OCR the PNG so the page can be
+                # indexed at all. Runs ONLY on empty pages, so text PDFs pay nothing.
                 from .ocr import ocr_image
 
                 text = ocr_image(img_path)

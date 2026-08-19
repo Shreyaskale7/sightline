@@ -478,8 +478,15 @@ uplFile.addEventListener("change", async () => {
     const fd = new FormData();
     files.forEach(f => fd.append("files", f));
     const r = await fetch("/upload", { method: "POST", body: fd });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
+    // Infrastructure failures (a killed container, a proxy timeout) reply in plain text, not
+    // JSON. Parsing blindly turned those into "Unexpected token 'S'", which hides the real
+    // cause — so read the body defensively and surface the actual status.
+    let d = null;
+    try { d = await r.json(); } catch (_) { d = null; }
+    if (!r.ok) {
+      throw new Error((d && d.detail) || `${r.status} ${r.statusText || "upload failed"} — the document may be too large; try a smaller PDF.`);
+    }
+    if (!d) throw new Error("The server returned an unreadable response.");
 
     (d.documents || []).forEach(doc => {
       if (doc.error) {

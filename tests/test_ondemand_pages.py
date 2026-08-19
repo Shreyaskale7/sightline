@@ -59,3 +59,34 @@ def test_returns_none_when_unrenderable(tmp_path):
     work.mkdir()
     _two_page_pdf(work / "filing.pdf")
     assert ensure_page_image(work / "p0099.png", page_no=99) is None
+
+
+def test_upload_does_not_rasterize_eagerly(tmp_path):
+    """Serving must not write every page image up front.
+
+    A container's writable filesystem is often memory-backed, so rasterizing a few hundred pages
+    during an upload means hundreds of MB of RAM on top of the loaded models — which is what
+    OOM-killed the deployed container. The images are derived data we render on demand anyway.
+    """
+    from sightline.ingest.store import MetadataStore
+    from sightline.ingest.upload import ingest_upload
+
+    doc = fitz.open()
+    for i in range(12):
+        doc.new_page(width=612, height=792).insert_text((72, 100), f"Page {i+1} revenue 60,922")
+    data = doc.tobytes()
+    doc.close()
+
+    store = MetadataStore(tmp_path / "sightline.db")
+    filing, pages = ingest_upload(data, "report.pdf", store, tmp_path)
+    store.close()
+
+    assert len(pages) == 12
+    assert all(p.text for p in pages)                    # text still extracted for indexing
+    written = list((tmp_path / "pages").rglob("*.png"))
+    assert written == []                                 # nothing rasterized up front
+    assert (tmp_path / "pages" / filing.accession_nodash / "filing.pdf").exists()
+
+    # ...and the images are still obtainable, rendered from the stored PDF on first view.
+    got = ensure_page_image(pages[3].image_path, page_no=4)
+    assert got is not None and got.exists()

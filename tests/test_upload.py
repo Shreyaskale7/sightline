@@ -58,7 +58,12 @@ def test_ingest_upload_end_to_end(tmp_path):
     with MetadataStore(tmp_path / "db.sqlite") as store:
         filing, pages = ingest_upload(_tiny_pdf(), "MyCo-Annual.pdf", store, tmp_path)
         assert filing.form == "UPLOAD" and filing.ticker == "MYCOAN"
-        assert len(pages) == 1 and pages[0].image_path.exists()
+        # The page image is NOT written up front (that rasterization is what OOM-killed the
+        # deployed container); it is rendered from the stored PDF on first view instead.
+        assert len(pages) == 1 and not pages[0].image_path.exists()
+        from sightline.ingest.rasterize import ensure_page_image
+
+        assert ensure_page_image(pages[0].image_path, page_no=1) is not None
         assert "9,876" in pages[0].text
         assert store.is_ingested(filing.accession)
         # provenance flows to the indexer's input

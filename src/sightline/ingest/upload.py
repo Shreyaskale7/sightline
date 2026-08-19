@@ -62,6 +62,7 @@ def ingest_upload(
     filename: str,
     store: MetadataStore,
     data_dir: Path,
+    write_images: bool = False,
 ) -> tuple[Filing, list[Page]]:
     """Persist an uploaded PDF as pages (images + text). Idempotent on content hash.
 
@@ -93,7 +94,11 @@ def ingest_upload(
     pdf_path = work_dir / "filing.pdf"
     pdf_path.write_bytes(pdf_bytes)
 
-    pages = build_pages(pdf_path, work_dir, accession)
+    # Default write_images=False: page PNGs are derived data, rendered on first view from the
+    # PDF we just stored. Rasterizing a few hundred pages up front is what OOM-killed the
+    # container on a memory-backed filesystem — and it bought nothing, since the same images
+    # are produced on demand anyway.
+    pages = build_pages(pdf_path, work_dir, accession, write_images=write_images)
     if not pages:
         raise UploadError("Couldn't read any pages from this PDF.")
     if len(pages) > MAX_PAGES:
