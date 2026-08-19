@@ -393,7 +393,13 @@ f.addEventListener("submit", async (e) => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: q.value, k: 5, scope: currentScope }),
     });
-    if (!r.ok) throw new Error("HTTP " + r.status + " — is the index built and an LLM key configured?");
+    if (!r.ok) {
+      // 503 = the service is fine, the model's usage allowance is spent. Show the provider's
+      // own words: "try again later" is actionable, "HTTP 500" reads like the app is broken.
+      let msg = "HTTP " + r.status + " — is the index built and an LLM key configured?";
+      try { const j = await r.json(); if (j && j.detail) msg = j.detail; } catch (_) {}
+      throw new Error(msg);
+    }
     const d = await r.json();
     const s = ((performance.now() - t0) / 1000).toFixed(1);
     const n = d.citations.length;

@@ -15,7 +15,14 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+from ..llm import QuotaExceeded
 from ..observability import span
+
+
+def _quota_http(e: QuotaExceeded) -> HTTPException:
+    """503, not 500: the service is fine, the model allowance is spent — and that distinction is
+    what tells a user to come back later rather than assume the app is broken."""
+    return HTTPException(status_code=503, detail=str(e))
 
 app = FastAPI(title="Sightline", version="0.1.0")
 
@@ -483,7 +490,12 @@ def query(req: QueryRequest) -> QueryResponse:
             with span("fetch_pages") as s:
                 pages = [p for h in hits if (p := store.get_page(h.accession, h.page_no))]
                 s["n_pages"] = len(pages)
-            result = Answerer().answer(req.question, pages)
+            try:
+                result = Answerer().answer(req.question, pages)
+            except QuotaExceeded as e:
+                # Retrieval already succeeded; only the model call was refused. Report that
+                # plainly as 503 rather than a 500 that reads like the app is broken.
+                raise _quota_http(e) from None
             with span("verify") as s:
                 verdict = verify(result, {(p.accession, p.page_no) for p in pages})
                 s["forced_abstain"] = verdict.forced_abstain

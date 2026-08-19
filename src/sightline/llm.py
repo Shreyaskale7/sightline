@@ -45,13 +45,58 @@ class _Response:
     usage: dict[str, Any] | None = None
 
 
+def _quota_message(resp: Any, model: str) -> str:
+    """A human-readable reason from a 429, preferring whatever the provider actually said.
+
+    Providers vary in where they put the detail, so this digs a little and then falls back to a
+    plain sentence — the caller needs *something* it can show a user, never an empty error.
+    """
+    detail = ""
+    try:
+        body = resp.json()
+        err = body.get("error")
+        if isinstance(err, dict):
+            detail = str(err.get("message") or "")
+        elif isinstance(err, str):
+            detail = err
+        detail = detail or str(body.get("message") or "")
+    except Exception:
+        detail = (getattr(resp, "text", "") or "")[:200]
+    detail = " ".join(detail.split())[:240]
+    base = f"Usage limit reached for '{model}'"
+    return f"{base}: {detail}" if detail else (
+        f"{base}. Free tiers reset daily — try again later, or switch LLM_MODEL to a model "
+        "with remaining allowance."
+    )
+
+
+class QuotaExceeded(RuntimeError):
+    """The provider refused because a usage allowance is spent, not because we went too fast.
+
+    Separated from a transient rate limit because the correct responses are opposite: a
+    per-minute limit should be waited out, a spent daily allowance should fail immediately with
+    a clear message. Retrying the latter just makes the user stare at a spinner for minutes
+    before an opaque error.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
 class _OpenAICompatMessages:
     """Free-tier etiquette lives here: gateways cap requests per MINUTE as well as per day.
     We throttle proactively for `:free` models (cheaper than tripping the limit) and retry
-    with exponential backoff on 429s (a 429 means "slow down", not "give up")."""
+    with backoff on 429s — but only a couple of times.
+
+    Both limits arrive as a 429, so the retry budget is deliberately small: if a short wait
+    doesn't clear it, the cause is almost certainly a spent allowance rather than pacing, and
+    the useful thing is to say so at once (QuotaExceeded) instead of burning minutes on
+    exponential backoff and then surfacing a generic failure."""
 
     _FREE_INTERVAL_S = 4.0  # floor for `:free` models, ~15 req/min
     _MAX_RETRIES = 4
+    _RATE_LIMIT_RETRIES = 2      # 429s only: ~5s + ~10s, then give a straight answer
 
     def __init__(self, base_url: str, api_key: str) -> None:
         self._client = httpx.Client(
@@ -90,10 +135,13 @@ class _OpenAICompatMessages:
                     continue
                 raise
             self._last_call = time.monotonic()
-            if resp.status_code == 429 and attempt < self._MAX_RETRIES:
-                time.sleep(backoff)  # rate-limited: wait it out and retry
-                backoff *= 2
-                continue
+            if resp.status_code == 429:
+                # A short wait clears real pacing limits. If it doesn't, the allowance is spent —
+                # say so immediately rather than backing off for minutes into a generic error.
+                if attempt < self._RATE_LIMIT_RETRIES:
+                    time.sleep(5.0 * (attempt + 1))
+                    continue
+                raise QuotaExceeded(_quota_message(resp, model))
             resp.raise_for_status()
             data = resp.json()
             if "error" in data:  # OpenRouter can return 200 with an embedded error
